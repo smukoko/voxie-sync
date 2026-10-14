@@ -23,12 +23,14 @@ paragraph with no word timings -- returns None and the caller keeps the
 paragraph's start, the safe side.
 
 Standard library only: the gateway's container has no lxml (requirements-gateway.txt).
+Every file of the book, its OPF included, goes through html.parser, which
+never expands an entity the book declares: the gateway reads books people
+upload, and xml.etree would (bandit B314, the public repo's first scan).
 """
 import posixpath
 import re
 import zipfile
 from html.parser import HTMLParser
-from xml.etree import ElementTree
 
 # Narrated words before the page's first one: covers the spoken-form drift
 # between the page's text and what the narrator says. Measured on Redeeming
@@ -49,10 +51,11 @@ _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "me
 
 
 class _Element:
-    __slots__ = ("tag", "children", "parent")
+    __slots__ = ("tag", "children", "parent", "attrs")
 
-    def __init__(self, tag, parent=None):
+    def __init__(self, tag, parent=None, attrs=()):
         self.tag, self.children, self.parent = tag, [], parent
+        self.attrs = {k.split(":")[-1].lower(): v for k, v in attrs}
 
     def elements(self, tag=None):
         return [c for c in self.children if isinstance(c, _Element) and (tag is None or c.tag == tag)]
@@ -70,13 +73,13 @@ class _TreeBuilder(HTMLParser):
         self.current = self.root
 
     def handle_starttag(self, tag, attrs):
-        el = _Element(tag.split(":")[-1].lower(), self.current)
+        el = _Element(tag.split(":")[-1].lower(), self.current, attrs)
         self.current.children.append(el)
         if el.tag not in _VOID:
             self.current = el
 
     def handle_startendtag(self, tag, attrs):
-        self.current.children.append(_Element(tag.split(":")[-1].lower(), self.current))
+        self.current.children.append(_Element(tag.split(":")[-1].lower(), self.current, attrs))
 
     def handle_endtag(self, tag):
         tag = tag.split(":")[-1].lower()
@@ -93,14 +96,20 @@ class _TreeBuilder(HTMLParser):
             self.current.children.append(data)
 
 
+def _parse(data):
+    tree = _TreeBuilder()
+    tree.feed(data.decode("utf-8", errors="replace"))
+    return tree.root
+
+
 def _spine(zf):
     """The book's documents in reading order: crengine's DocFragment[1..n]."""
-    container = ElementTree.fromstring(zf.read("META-INF/container.xml"))
-    opf_path = next(el.get("full-path") for el in container.iter() if el.tag.endswith("rootfile"))
-    opf = ElementTree.fromstring(zf.read(opf_path))
+    container = _parse(zf.read("META-INF/container.xml"))
+    opf_path = next(el.attrs.get("full-path") for el in _iter(container) if el.tag == "rootfile")
+    opf = _parse(zf.read(opf_path))
     base = posixpath.dirname(opf_path)
-    items = {el.get("id"): el.get("href") for el in opf.iter() if el.tag.endswith("}item") or el.tag == "item"}
-    hrefs = [items.get(el.get("idref")) for el in opf.iter() if el.tag.endswith("itemref") or el.tag == "itemref"]
+    items = {el.attrs.get("id"): el.attrs.get("href") for el in _iter(opf) if el.tag == "item"}
+    hrefs = [items.get(el.attrs.get("idref")) for el in _iter(opf) if el.tag == "itemref"]
     return [posixpath.normpath(posixpath.join(base, h)) for h in hrefs if h]
 
 
@@ -164,9 +173,8 @@ def page_fraction(epub_path, position, paragraph_path):
         index = int(m.group(1))
         if not 1 <= index <= len(spine):
             return None
-        tree = _TreeBuilder()
-        tree.feed(zf.read(spine[index - 1]).decode("utf-8", errors="replace"))
-    bodies = [el for el in _iter(tree.root) if el.tag == "body"]
+        root = _parse(zf.read(spine[index - 1]))
+    bodies = [el for el in _iter(root) if el.tag == "body"]
     if not bodies:
         return None
     steps = [s for s in m.group(2).split("/") if s]
@@ -230,7 +238,7 @@ def page_start_time(epub_path, position, paragraph_path, span, nodes_words):
     """
     try:
         fraction = page_fraction(epub_path, position, paragraph_path)
-    except (OSError, KeyError, ValueError, zipfile.BadZipFile, ElementTree.ParseError, StopIteration):
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile, StopIteration):
         return None
     if not fraction:
         return None

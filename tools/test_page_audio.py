@@ -44,10 +44,10 @@ DOC_B = f"""<?xml version="1.0" encoding="utf-8"?>
 </div></body></html>"""
 
 
-def kepub():
+def kepub(container=CONTAINER):
     path = os.path.join(tempfile.mkdtemp(), "b.kepub.epub")
     with zipfile.ZipFile(path, "w") as z:
-        z.writestr("META-INF/container.xml", CONTAINER)
+        z.writestr("META-INF/container.xml", container)
         z.writestr("OEBPS/content.opf", OPF)
         z.writestr("OEBPS/a.xhtml", "<html><body><p>a</p></body></html>")
         z.writestr("OEBPS/text/b.xhtml", DOC_B)
@@ -77,6 +77,17 @@ check("a fragment the book does not have", PA.page_fraction(BOOK, "/body/DocFrag
 check("an element the page does not have", PA.page_fraction(BOOK, "/body/DocFragment[2]/body/div/p[7]/span[1]/text().0",
                                                             "/body/DocFragment[2]/body/div/p[7]") is None)
 check("a position outside the paragraph asked about", PA.page_fraction(BOOK, P3 + "/em/span[1]/text().0", PARA) is None)
+
+# A book declaring entities must not have them expanded (the gateway reads uploads).
+BOMB = kepub('<?xml version="1.0"?><!DOCTYPE c [<!ENTITY a "aaaaaaaaaa">'
+             '<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">]>'
+             '<container><rootfiles><rootfile full-path="OEBPS/content.opf">&c;</rootfile></rootfiles></container>')
+f = PA.page_fraction(BOMB, PARA + "/span[2]/text().0", PARA)
+check("a book's own entities are never expanded, and the page is still found",
+      f is not None and abs(f - 20 / 41) < 1e-9, f)
+import re  # noqa: E402
+check("no XML parser that expands entities is imported",
+      not re.search(r"^\s*(import xml|from xml)", open(PA.__file__).read(), re.M))
 
 # Narrated words for P2: (char_start, char_end, start time), one word a second from 100 s.
 TEXT = "One two three four. Five six seven eight."
