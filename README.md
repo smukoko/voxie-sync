@@ -129,3 +129,4 @@ builds on: [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
 
 Kobo is a trademark of Rakuten Kobo Inc.; KOReader and Audiobookshelf belong
 to their projects. Voxie is an independent project.
+
