@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Voxie">
+  <title>Voxie</title>
+  <!-- A page with a folded corner that is also a speech bubble: the book, spoken. -->
+  <defs>
+    <mask id="cut">
+      <rect width="256" height="256" fill="#fff"/>
+      <path fill="#000" d="M158 28 L220 90 H174 C165 90 158 83 158 74 Z"/>
+      <path fill="#000" d="M84 76 H110 L128 126 L146 76 H172 L140 158 C136 168 120 168 116 158 Z"/>
+    </mask>
+  </defs>
+  <g fill="#111111">
+    <path mask="url(#cut)" d="M56 28 H158 L220 90 V174 C220 187 210 196 197 196 H118 L70 234 V196 H56 C43 196 34 187 34 174 V50 C34 37 43 28 56 28 Z"/>
+    <path d="M166 36 L212 82 H178 C171 82 166 77 166 70 Z"/>
+  </g>
+</svg>

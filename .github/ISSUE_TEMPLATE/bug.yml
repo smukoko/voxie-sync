@@ -1,0 +1,30 @@
+name: Bug
+description: Something does not work as the docs say.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The commands you ran, or what you did on the device.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        The engine's output, or ~/Library/Logs/librasync-ghost.out for the watcher.
+        Remove any key, token, address or password before pasting.
+      render: text
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: "macOS version; narration route (CPU, your GPU, RunPod); e-reader model and KOReader version if it is a device problem."

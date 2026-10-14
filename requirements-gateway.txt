@@ -1,0 +1,19 @@
+# Dependencies for the gateway container ONLY (librerian_gateway_v3.py).
+# Pinned, and checked for known vulnerabilities on every pull request
+# (pip-audit in .github/workflows/security.yml).
+#
+# Deliberately not requirements.txt: that file carries the engine's ML stack
+# (sentence-transformers pulls ~2.5GB of torch, plus xgboost and numpy), and
+# the gateway imports none of it -- it needs Flask, requests, dotenv and
+# the standard library, nothing more. Installing the full set built a
+# multi-gigabyte image for a Flask app and could exhaust the Docker disk.
+#
+# The engine does not run in this container. It runs on the Mac via mac_ghost.py
+# and uploads finished sync packs here, so its dependencies belong on the host.
+flask==3.1.3
+# Production WSGI server -- see start.sh for why -w 1 is required.
+gunicorn==23.0.0
+requests==2.34.2
+python-dotenv==1.2.4
+# Fernet, for each account's Audiobookshelf token at rest (core/abs_settings.py).
+cryptography==50.0.1

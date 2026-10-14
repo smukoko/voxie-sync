@@ -1,0 +1,87 @@
+# Runs the two long-lived services: Audiobookshelf and the Librarian gateway.
+# Provider-agnostic on purpose -- this same file runs on a Hetzner CX22, any
+# other VPS, or the Mac. The engine is NOT here: it needs a GPU pod and Docker
+# for MFA, and runs on the Mac via mac_ghost.py.
+#
+# ⚠️  Published ports are NOT protected by ufw. Docker inserts its own iptables
+# rules ahead of ufw's chain, so a published port stays reachable however ufw is
+# configured. Use the Hetzner Cloud Firewall (or your provider's equivalent),
+# which filters outside the host, where Docker cannot override it.
+
+services:
+  # 1. AUDIOBOOKSHELF: The core engine for ebooks and audio
+  audiobookshelf:
+    # Pinned: the version running on 2026-09-26. The gateway speaks ABS's API
+    # (progress, items, chapters); an unattended upgrade could change it under us.
+    image: ghcr.io/advplyr/audiobookshelf:2.36.0
+    container_name: audiobookshelf
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./config/abs:/config
+      - ./metadata/abs:/metadata
+      - ./library:/library
+    ports:
+      # Public: the Audiobookshelf phone app connects here from anywhere.
+      # Behind HTTPS (DOMAIN set) Caddy takes 13378, and this moves to
+      # 127.0.0.1:13379 so only the host itself reaches it in plain http.
+      - "${ABS_BIND:-13378}:80"
+    restart: unless-stopped
+
+  # 2. VOXIE: Our custom Gateway
+  librarian:
+    build: .
+    container_name: librarian_server
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      # Overrides whatever .env says. Inside this container 127.0.0.1 is the
+      # gateway itself, not Audiobookshelf, so the host-facing value in .env
+      # (which the Mac uses when running the gateway bare) would break every
+      # ABS call. "audiobookshelf" is the compose service name.
+      - ABS_URL=http://audiobookshelf:80
+    volumes:
+      - ./library:/app/library
+      - ./incoming:/app/incoming
+      - ./archive:/app/archive
+      - ./safe_models:/app/safe_models
+    ports:
+      # Public: the Kobo pings this from any network it happens to be on.
+      # Behind HTTPS it is bound to 127.0.0.1 and reached through Caddy.
+      - "${GATEWAY_BIND:-3000}:3000"
+    depends_on:
+      - audiobookshelf
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5).status == 200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # 3. HTTPS, only when the server has a domain (server/install_server.py sets
+  # COMPOSE_PROFILES=https and DOMAIN in .env). Caddy fetches and renews a
+  # Let's Encrypt certificate by itself: the gateway on https://<domain>, and
+  # Audiobookshelf on https://<domain>:13378 for the phone app. Without a
+  # domain this service does not start and the ports above stay public.
+  caddy:
+    image: caddy:2.10.2
+    container_name: voxie_caddy
+    profiles: ["https"]
+    environment:
+      - DOMAIN=${DOMAIN:-}
+    volumes:
+      - ./server/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The certificates. Kept on the host so a rebuild does not ask Let's
+      # Encrypt again (it rate-limits repeated issues for one name).
+      - ./config/caddy/data:/data
+      - ./config/caddy/config:/config
+    ports:
+      - "80:80"        # Let's Encrypt's challenge, and the redirect to https
+      - "443:443"
+      - "13378:13378"
+    depends_on:
+      - librarian
+      - audiobookshelf
+    restart: unless-stopped

@@ -1,0 +1,46 @@
+# The gateway container runs one Flask app (start.sh -> librerian_gateway_v3.py).
+# Without this file, "COPY . ." shipped 1.8GB into the image and could exhaust
+# the Docker disk mid-build.
+#
+# NOTE: comments must be on their own line. Docker treats a trailing "# ..." as
+# part of the pattern, so "training_lab/  # secrets" silently matches nothing.
+
+# --- Secrets. Docker does NOT honour .gitignore, so these must be named here ---
+.env
+.env.*
+# training_lab is documented as holding plaintext API keys on disk
+training_lab/
+
+# --- Bind-mounted at runtime by docker-compose, so copying them is pointless ---
+library/
+incoming/
+archive/
+safe_models/
+config/
+metadata/
+
+# --- Engine-only, and the engine runs on the Mac, not in this container ---
+mfa_workspace/
+data/
+tools/
+# ...except the account admin, which has to run where the gateway's database is
+!tools/gateway_admin.py
+# abandoned prior versions, never to be resurrected
+whisper_dump/
+
+# --- Frontend runs locally on the Mac, never deployed ---
+
+# --- Repo and build noise ---
+.git/
+.gitignore
+.gitmodules
+.github/
+.claude/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.DS_Store
+*.zip
+*.epub
+*.mp3
+*.wav

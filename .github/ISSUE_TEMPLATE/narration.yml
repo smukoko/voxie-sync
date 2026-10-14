@@ -1,0 +1,60 @@
+name: Something sounded wrong
+description: A word said wrong, something read that should not be, a skipped line, a glitch, or sync landing in the wrong place. No technical knowledge needed.
+labels: [narration]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! Every report makes the next book sound better, for everyone.
+        You do not need to know anything about how Voxie works. Please never attach the book or the audio: the title and where it happened are enough.
+  - type: input
+    id: book
+    attributes:
+      label: Which book?
+      description: Title and author.
+      placeholder: Boule de Suif, Guy de Maupassant
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where?
+      description: The chapter and the time your app shows, or a few words of the text around it.
+      placeholder: "Chapter 13, 9:52 / or: \"chez monsieur le premier président de Mortemain\""
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What was wrong?
+      options:
+        - A word was said wrong
+        - A number, date or abbreviation was said wrong
+        - Something was read that is not part of the story (a page number, a note, a title page...)
+        - Something was skipped
+        - A chapter starts in the wrong place, or has the wrong name
+        - A glitch, stutter or strange sound
+        - My Kobo or phone opened at the wrong place
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: heard
+    attributes:
+      label: What did you hear, and what did you expect?
+      placeholder: It said "vi-la Padoie", the book says "V'là Padoie" (should sound like "vla").
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: Language of the book
+      placeholder: English
+  - type: dropdown
+    id: route
+    attributes:
+      label: How was it narrated? (skip it if you are not sure)
+      options:
+        - I don't know
+        - On my own computer (the free voices)
+        - On a rented GPU (RunPod)

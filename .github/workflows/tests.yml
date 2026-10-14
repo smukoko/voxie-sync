@@ -1,0 +1,97 @@
+name: Tests
+
+# Every offline suite and the KOReader plugin, on every pull request. No GPU,
+# no network service, no secret: tools/run_all_tests.sh fakes all of them, and
+# a test that needs Docker (test_fat_check) runs because the runner has it.
+#
+# Plus layer 1's gates (docs/TESTING.md): coverage may only go up and changed
+# lines must be tested; a pull request's tests must fail on the code before it;
+# the logic it touches is mutation-tested. Each job is a required check.
+on:
+  pull_request:
+    # labeled/unlabeled: the no-behaviour-change label changes what the
+    # regression proof asks for, so adding it re-runs the gates.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: System tools
+        run: sudo apt-get update && sudo apt-get install -y luajit ffmpeg espeak-ng
+
+      # CPU wheels first: sentence-transformers and kokoro pull torch, and the
+      # default Linux wheel brings ~2.5 GB of CUDA the tests never use.
+      - name: Python dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Tests
+        run: tools/run_all_tests.sh
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: System tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
+      - name: Python dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt coverage
+          pip install -e .
+      - name: Coverage only goes up; changed lines are tested
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python tools/coverage_gate.py --diff "origin/${{ github.base_ref }}"
+          else
+            python tools/coverage_gate.py
+          fi
+
+  regression-proof:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: System tools
+        run: sudo apt-get update && sudo apt-get install -y luajit ffmpeg espeak-ng
+      - name: Python dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e .
+      - name: The new tests fail on the old code
+        run: >
+          python tools/regression_proof.py --base "origin/${{ github.base_ref }}"
+          --labels "${{ join(github.event.pull_request.labels.*.name, ',') }}"
+      - name: The changed logic is mutation-tested
+        run: python tools/mutation_test.py --changed "origin/${{ github.base_ref }}"

@@ -1,0 +1,16 @@
+{
+ "core/ai_brain.py": 24.0,
+ "core/block_filter.py": 72.0,
+ "core/chunk_cache.py": 28.0,
+ "core/chunking.py": 52.0,
+ "core/director.py": 80.0,
+ "core/drm.py": 75.0,
+ "core/gateway_address.py": 100.0,
+ "core/junk_provider.py": 56.0,
+ "core/landing.py": 76.0,
+ "core/languages.py": 66.7,
+ "core/narration.py": 52.0,
+ "core/pod_pool.py": 68.0,
+ "core/structure.py": 64.0,
+ "libra_cli/clip_check.py": 36.0
+}

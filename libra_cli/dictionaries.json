@@ -1,0 +1,174 @@
+{
+  "_comment": "Dictionaries setup_kobo can install over the cable. Pinned: every archive is checked against its sha256 before it reaches a device. WikDict rebuilds its files in place under the same URL, so its checksums will eventually go stale -- that fails loudly, and `python -m libra_cli.dictionaries --refresh` rewrites them after you look.",
+  "version": 1,
+  "dictionaries": [
+    {
+      "id": "en-en",
+      "name": "English",
+      "languages": [
+        "en"
+      ],
+      "kind": "monolingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/en-en.zip",
+      "sha256": "142327769b0f4e2cd0e442a826bc6e561e5246a7796934ff23618c1c6984ab3c",
+      "archive_bytes": 91941511,
+      "unpacked_bytes": 119077211,
+      "archive_root": "en-en",
+      "entries": 815066,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "fr-fr",
+      "name": "Français",
+      "languages": [
+        "fr"
+      ],
+      "kind": "monolingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/fr-fr.zip",
+      "sha256": "66362d0fa6379276c62f6e5fbfab78217e20ea333ded873dd53a1c41bf4428d4",
+      "archive_bytes": 73065038,
+      "unpacked_bytes": 109436322,
+      "archive_root": "fr-fr",
+      "entries": 514854,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "nl-nl",
+      "name": "Nederlands",
+      "languages": [
+        "nl"
+      ],
+      "kind": "monolingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/nl-nl.zip",
+      "sha256": "adac4804d3dfb35e91c7bff384366b48a252d8bb1005b67e974a0950e3f476e1",
+      "archive_bytes": 29226855,
+      "unpacked_bytes": 38950173,
+      "archive_root": "nl-nl",
+      "entries": 195662,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "en-fr",
+      "name": "English → Français",
+      "languages": [
+        "en",
+        "fr"
+      ],
+      "kind": "bilingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/en-fr.zip",
+      "sha256": "6c610d35d1b16b71787d6d04586eed9fc5c0c682d6e68ea981f1dbb44f349371",
+      "archive_bytes": 6859704,
+      "unpacked_bytes": 9144915,
+      "archive_root": "en-fr",
+      "entries": 84803,
+      "license": "CeCILL-C Free Software License Agreement",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "es-en",
+      "name": "Español → English",
+      "languages": [
+        "es",
+        "en"
+      ],
+      "kind": "bilingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/es-en.zip",
+      "sha256": "1dea828174133f36d3f76dfa93b541b0cb23965b851841924ae72be747d8e2ae",
+      "archive_bytes": 12506318,
+      "unpacked_bytes": 29366746,
+      "archive_root": "es-en",
+      "entries": 129570,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "es-fr",
+      "name": "Español → Français",
+      "languages": [
+        "es",
+        "fr"
+      ],
+      "kind": "bilingual",
+      "source": "koreader-dicts v1.2.0",
+      "url": "https://github.com/DanielGregorini/koreader-dicts/releases/download/v1.2.0/es-fr.zip",
+      "sha256": "65c2935399eea5d9baee932431f04cdd87232f9ab1cfc82f4bf4a38713be6cc8",
+      "archive_bytes": 2025195,
+      "unpacked_bytes": 2266112,
+      "archive_root": "es-fr",
+      "entries": 24805,
+      "license": "CeCILL-C Free Software License Agreement",
+      "ships_attribution": true,
+      "default": true
+    },
+    {
+      "id": "fr-nl",
+      "name": "Français → Nederlands",
+      "languages": [
+        "fr",
+        "nl"
+      ],
+      "kind": "bilingual",
+      "source": "WikDict (FreeDict)",
+      "url": "https://download.wikdict.com/dictionaries/stardict/wikdict-fr-nl.zip",
+      "sha256": "0f64d05705c193e8df2358a19f43078bd6e5740e77611a0947d33658515146ad",
+      "archive_bytes": 1537927,
+      "unpacked_bytes": 7441895,
+      "archive_root": "wikdict-fr-nl",
+      "entries": 33365,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": false,
+      "default": true
+    },
+    {
+      "id": "nl-fr",
+      "name": "Nederlands → Français",
+      "languages": [
+        "nl",
+        "fr"
+      ],
+      "kind": "bilingual",
+      "source": "WikDict (FreeDict)",
+      "url": "https://download.wikdict.com/dictionaries/stardict/wikdict-nl-fr.zip",
+      "sha256": "62a84f4c6e825a5852b33c3063c01c3d252876ae343f596125721a67af90319a",
+      "archive_bytes": 816886,
+      "unpacked_bytes": 3782015,
+      "archive_root": "wikdict-nl-fr",
+      "entries": 21948,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": false,
+      "default": true
+    },
+    {
+      "id": "de-nl",
+      "name": "Deutsch → Nederlands",
+      "languages": [
+        "de",
+        "nl"
+      ],
+      "kind": "bilingual",
+      "source": "WikDict (FreeDict)",
+      "url": "https://download.wikdict.com/dictionaries/stardict/wikdict-de-nl.zip",
+      "sha256": "c7e406d1e0d983dc904ad0b831a57b82b23552af06eb0418706bab877cf225c3",
+      "archive_bytes": 3008653,
+      "unpacked_bytes": 13208487,
+      "archive_root": "wikdict-de-nl",
+      "entries": 21267,
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "ships_attribution": false,
+      "default": true
+    }
+  ]
+}

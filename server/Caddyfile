@@ -1,0 +1,15 @@
+# HTTPS in front of the Voxie gateway and Audiobookshelf, used only when the
+# server has a domain (the "https" profile in docker-compose.yml). DOMAIN comes
+# from the server's .env. One name, one certificate, two ports.
+
+# The gateway: what the Kobo, KOReader's Progress sync and the catalogue use.
+# Caddy sends X-Forwarded-Proto/Host, which the gateway reads for its own
+# public address (the plugin download link).
+{$DOMAIN} {
+	reverse_proxy librarian:3000
+}
+
+# Audiobookshelf, for the phone app: https://<domain>:13378.
+{$DOMAIN}:13378 {
+	reverse_proxy audiobookshelf:80
+}

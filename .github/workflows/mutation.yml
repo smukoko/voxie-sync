@@ -1,0 +1,33 @@
+name: Mutation testing
+
+# Every logic module, every night (a pull request runs only the modules it touches)
+# (docs/TESTING.md, layer 1). A trend report: a module more than 15 points
+# under its recorded score is a warning to read. The pull-request gate is the
+# strict one: the bugs planted in a change's own lines must be caught.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: System tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
+      - name: Python dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Mutation testing
+        run: python tools/mutation_test.py --report

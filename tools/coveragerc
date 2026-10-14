@@ -1,0 +1,14 @@
+# What layer 1's coverage gate measures (tools/coverage_gate.py): the product,
+# not its tests, dev tools or experiments.
+[run]
+parallel = True
+relative_files = True
+source = .
+omit =
+    tools/*
+    training_lab/*
+    docs/*
+    setup.py
+
+[report]
+skip_empty = True

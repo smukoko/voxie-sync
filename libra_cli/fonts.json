@@ -1,0 +1,129 @@
+{
+  "_comment": "Reading fonts setup_kobo installs to the device's fonts/ folder, which KOReader scans (EXT_FONT_DIR=/mnt/onboard/fonts in platform/kobo/koreader.sh) and Nickel reads too. Static Regular/Italic/Bold/BoldItalic per family, because crengine finds emphasis by separate files. Every file is pinned to a commit and a sha256.",
+  "version": 1,
+  "families": [
+    {
+      "id": "Literata",
+      "family": "Literata",
+      "note": "Designed for long reading on screens; Google Play Books' reading face.",
+      "repo": "googlefonts/literata",
+      "commit": "0c2761b727a1b3a7cffd313c37f0f5163dfc7a63",
+      "license": "SIL Open Font License 1.1",
+      "license_file": {
+        "file": "OFL-Literata.txt",
+        "url": "https://raw.githubusercontent.com/googlefonts/literata/0c2761b727a1b3a7cffd313c37f0f5163dfc7a63/OFL.txt",
+        "sha256": "8742963604cd89dc81437811a850018fc03b2bfad686d7422c8235967c87614e",
+        "bytes": 4389
+      },
+      "files": [
+        {
+          "file": "Literata-Regular.ttf",
+          "url": "https://raw.githubusercontent.com/googlefonts/literata/0c2761b727a1b3a7cffd313c37f0f5163dfc7a63/fonts/ttf/Literata-Regular.ttf",
+          "sha256": "0390890de9bb9d5862a6ba4125b82c61792ccc3d66b63e73eee75c1a16fcd208",
+          "bytes": 319964
+        },
+        {
+          "file": "Literata-Italic.ttf",
+          "url": "https://raw.githubusercontent.com/googlefonts/literata/0c2761b727a1b3a7cffd313c37f0f5163dfc7a63/fonts/ttf/Literata-Italic.ttf",
+          "sha256": "198f70cc9a17bab578553fa274b81984d58c440efe26bc06f1d841c194b6691a",
+          "bytes": 304104
+        },
+        {
+          "file": "Literata-Bold.ttf",
+          "url": "https://raw.githubusercontent.com/googlefonts/literata/0c2761b727a1b3a7cffd313c37f0f5163dfc7a63/fonts/ttf/Literata-Bold.ttf",
+          "sha256": "b6af95b3b443cdbce964aa06741596987f2f5c3ede46a2bc846e5addd99d061f",
+          "bytes": 331304
+        },
+        {
+          "file": "Literata-BoldItalic.ttf",
+          "url": "https://raw.githubusercontent.com/googlefonts/literata/0c2761b727a1b3a7cffd313c37f0f5163dfc7a63/fonts/ttf/Literata-BoldItalic.ttf",
+          "sha256": "1dade59381ad02f4679d7e993a7a406472e587ac332af7a6168d3ad9214a99dc",
+          "bytes": 318888
+        }
+      ],
+      "default": true
+    },
+    {
+      "id": "CrimsonPro",
+      "family": "Crimson Pro",
+      "note": "A warm old-style book serif.",
+      "repo": "Fonthausen/CrimsonPro",
+      "commit": "833dc9de66d2bc388e21c8bff489ce1d55bb9e4f",
+      "license": "SIL Open Font License 1.1",
+      "license_file": {
+        "file": "OFL-CrimsonPro.txt",
+        "url": "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/833dc9de66d2bc388e21c8bff489ce1d55bb9e4f/OFL.txt",
+        "sha256": "1820869bd5baa1c2d88fa87c89eea532cf9442d841008acab720654b7f82823d",
+        "bytes": 4393
+      },
+      "files": [
+        {
+          "file": "CrimsonPro-Regular.ttf",
+          "url": "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/833dc9de66d2bc388e21c8bff489ce1d55bb9e4f/fonts/ttf/CrimsonPro-Regular.ttf",
+          "sha256": "ec2f9d7566d3473a76e4aec620501a4f90813dfd206d257b178d32b6da25fc01",
+          "bytes": 147428
+        },
+        {
+          "file": "CrimsonPro-Italic.ttf",
+          "url": "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/833dc9de66d2bc388e21c8bff489ce1d55bb9e4f/fonts/ttf/CrimsonPro-Italic.ttf",
+          "sha256": "336b662eff5e020d491504bb5e0cd1acb1da501506b4cd92102387e429bae3a0",
+          "bytes": 151220
+        },
+        {
+          "file": "CrimsonPro-Bold.ttf",
+          "url": "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/833dc9de66d2bc388e21c8bff489ce1d55bb9e4f/fonts/ttf/CrimsonPro-Bold.ttf",
+          "sha256": "8d172452d4aeebc490aba91217d4b322d94ac86b27d6f7a0d70e9a949013cfc9",
+          "bytes": 147872
+        },
+        {
+          "file": "CrimsonPro-BoldItalic.ttf",
+          "url": "https://raw.githubusercontent.com/Fonthausen/CrimsonPro/833dc9de66d2bc388e21c8bff489ce1d55bb9e4f/fonts/ttf/CrimsonPro-BoldItalic.ttf",
+          "sha256": "156549e87f2e607c9d8d60d12fefb8405ccdc34937765789a0459b85159dd605",
+          "bytes": 151192
+        }
+      ],
+      "default": true
+    },
+    {
+      "id": "EBGaramond",
+      "family": "EB Garamond",
+      "note": "Claude Garamond's roman, revived. The most traditional of the three.",
+      "repo": "octaviopardo/EBGaramond12",
+      "commit": "106a4a6d377987459ae5e68673a4570f13b957fb",
+      "license": "SIL Open Font License 1.1",
+      "license_file": {
+        "file": "OFL-EBGaramond.txt",
+        "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/106a4a6d377987459ae5e68673a4570f13b957fb/OFL.txt",
+        "sha256": "058611bd968817d532cedeab6acaa055e882d365a88523df00e7917ad7a0f704",
+        "bytes": 4454
+      },
+      "files": [
+        {
+          "file": "EBGaramond-Regular.ttf",
+          "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/106a4a6d377987459ae5e68673a4570f13b957fb/fonts/ttf/EBGaramond-Regular.ttf",
+          "sha256": "2028dc06d3c130b4761693481436a32a8e35ed500bf58c25c53de004106125b8",
+          "bytes": 627304
+        },
+        {
+          "file": "EBGaramond-Italic.ttf",
+          "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/106a4a6d377987459ae5e68673a4570f13b957fb/fonts/ttf/EBGaramond-Italic.ttf",
+          "sha256": "d4ad1d0a9390d26d6d3f176117a1d121441edb8c8632bfca52cfad084b9059cb",
+          "bytes": 602136
+        },
+        {
+          "file": "EBGaramond-Bold.ttf",
+          "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/106a4a6d377987459ae5e68673a4570f13b957fb/fonts/ttf/EBGaramond-Bold.ttf",
+          "sha256": "0cfed122e51e3fd44ccedaef7637efed6d5bdc4ad89a6117d70241510309a186",
+          "bytes": 687396
+        },
+        {
+          "file": "EBGaramond-BoldItalic.ttf",
+          "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/106a4a6d377987459ae5e68673a4570f13b957fb/fonts/ttf/EBGaramond-BoldItalic.ttf",
+          "sha256": "3437cf76a720b01580218614e7f0ce9d66035a075c34a98394cec9a888cf38d6",
+          "bytes": 631696
+        }
+      ],
+      "default": true
+    }
+  ]
+}

@@ -1,0 +1,342 @@
+/* Voxie setup. The brand of the old setup page, kept: a cool instrument
+   white (graphite at night), and amber as the only colour, which is the
+   Kobo's own warm front-light. The one bold moment is the drawn Kobo, whose
+   screen warms as Voxie goes onto it. Everything else stays quiet. */
+
+@font-face { font-family: "Plex"; src: url("fonts/plex-sans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Plex"; src: url("fonts/plex-sans-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Plex"; src: url("fonts/plex-sans-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Plex Mono"; src: url("fonts/plex-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+
+:root {
+  --ground: #f1f3f5;
+  --panel: #ffffff;
+  --line: #d7dce2;
+  --track: #c2cad3;
+  --ink: #14171b;
+  --ink-dim: #5c6672;
+  --amber: #b77714;
+  --amber-ink: #8a5806;   /* amber that passes contrast as text on white */
+  --amber-soft: #f5e7cd;
+  --alarm: #b4442c;
+  --alarm-soft: #f6e0da;
+  --device: #2a2f36;
+  --paper: #e9ebe6;
+  --paper-ink: #b9bdb8;
+  --light-core: #ffd58a;
+  --light-edge: #f5e7cd;
+
+  --sans: "Plex", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 10px;
+  --radius-small: 6px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #101317;
+    --panel: #171b21;
+    --line: #262c34;
+    --track: #39424e;
+    --ink: #e6eaef;
+    --ink-dim: #8a93a0;
+    --amber: #e8a33d;
+    --amber-ink: #e8a33d;
+    --amber-soft: #2a2113;
+    --alarm: #d8674f;
+    --alarm-soft: #2e1a15;
+    --device: #0a0c0f;
+    --paper: #1d2127;
+    --paper-ink: #39414b;
+    --light-core: #e8a33d;
+    --light-edge: #3a2c14;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 1rem/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+[hidden] { display: none !important; }
+code, pre, kbd { font-family: var(--mono); font-size: 0.875em; }
+a { color: var(--amber-ink); text-underline-offset: 0.2em; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ------------------------------------------------------------- frame -- */
+.top {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.mark { display: block; }
+@media (prefers-color-scheme: dark) { .mark { filter: invert(1); } }
+.brand { font-weight: 600; letter-spacing: -0.01em; }
+
+.frame {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 40rem);
+  gap: 4rem;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 5rem;
+}
+.frame.no-rail { grid-template-columns: minmax(0, 40rem); justify-content: center; }
+
+/* The rail: a real sequence, so it is numbered. Done steps carry the amber. */
+.rail { align-self: start; position: sticky; top: 2rem; }
+.rail ol { list-style: none; margin: 0; padding: 0; }
+.rail li {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.55rem 0;
+  color: var(--ink-dim);
+}
+.rail .num {
+  display: inline-grid; place-items: center;
+  width: 1.75rem; height: 1.75rem;
+  border: 1.5px solid var(--track); border-radius: 50%;
+  font-size: 0.8125rem; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.rail li.current { color: var(--ink); font-weight: 600; }
+.rail li.current .num { border-color: var(--ink); }
+.rail li.done .num { border-color: var(--amber); background: var(--amber); color: var(--panel); }
+.rail li.done .num::before { content: "✓"; }
+.rail li.done .num { font-size: 0; }
+.rail li.done .num::before { font-size: 0.875rem; }
+
+/* -------------------------------------------------------------- type -- */
+h1 {
+  font-size: 2.25rem; line-height: 1.12; font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0 0 0.75rem;
+}
+h1:focus { outline: none; }
+h2 { font-size: 1.0625rem; font-weight: 600; margin: 0 0 0.35rem; }
+h2.minor { margin-top: 2rem; }
+.lead { font-size: 1.125rem; color: var(--ink-dim); margin: 0 0 2rem; max-width: 34rem; }
+p { margin: 0 0 0.75rem; }
+.fine { font-size: 0.8125rem; color: var(--ink-dim); }
+.optional { font-weight: 400; color: var(--ink-dim); font-size: 0.875rem; margin-left: 0.25rem; }
+
+.needs { padding-left: 1.1rem; margin: 0 0 2rem; }
+.needs li { margin-bottom: 0.6rem; }
+
+/* ------------------------------------------------------------ fields -- */
+.field { margin-bottom: 1.25rem; }
+label, legend { font-weight: 500; }
+.field > label { display: block; margin-bottom: 0.35rem; }
+input:not([type=radio]):not([type=checkbox]):not([type=file]), textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  padding: 0.65rem 0.8rem;
+}
+input:focus, textarea:focus { border-color: var(--amber); outline: none; box-shadow: 0 0 0 3px var(--amber-soft); }
+input::placeholder, textarea::placeholder { color: var(--track); }
+input[type=file] { font: inherit; color: var(--ink-dim); }
+textarea { resize: vertical; }
+.hint { font-size: 0.875rem; color: var(--ink-dim); margin: 0.35rem 0 0; }
+.error { color: var(--alarm); font-size: 0.875rem; margin: 0.35rem 0 0; }
+.error:empty, .status:empty, .hint:empty { display: none; }
+.status { font-size: 0.9375rem; margin: 0.5rem 0 0; color: var(--ink-dim); }
+.status.ok { color: var(--ink); }
+.status.ok::before { content: "✓ "; color: var(--amber); font-weight: 600; }
+.status.bad { color: var(--alarm); }
+.status.busy::before {
+  content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.5em;
+  border: 2px solid var(--track); border-top-color: var(--amber); border-radius: 50%;
+  vertical-align: -0.1em; animation: spin 0.8s linear infinite;
+}
+.row { display: flex; gap: 0.5rem; }
+.row input { flex: 1; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.with-toggle { position: relative; }
+.with-toggle input { padding-right: 4.5rem; }
+.with-toggle .toggle { position: absolute; right: 0.25rem; top: 50%; transform: translateY(-50%); }
+.check { display: flex; align-items: center; gap: 0.55rem; font-weight: 400; margin: 0.5rem 0; cursor: pointer; }
+input[type=radio], input[type=checkbox] { accent-color: var(--amber); width: 1.05rem; height: 1.05rem; margin: 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.consent legend { margin-bottom: 0.35rem; }
+.consent { margin-bottom: 1.25rem; }
+
+/* Two big options per decision: a radio, its whole row clickable. */
+.choices { display: grid; gap: 0.75rem; margin-bottom: 2rem; }
+.choice {
+  display: flex; gap: 0.9rem; align-items: flex-start;
+  padding: 1rem 1.1rem;
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 400;
+}
+.choice input { margin-top: 0.3rem; flex: none; }
+.choice:has(input:checked) { border-color: var(--amber); background: linear-gradient(var(--amber-soft), var(--amber-soft)) padding-box; }
+@media (prefers-color-scheme: dark) { .choice:has(input:checked) { background: var(--amber-soft); } }
+.choice:has(input:focus-visible) { outline: 2px solid var(--amber); outline-offset: 3px; }
+.choice-body { display: grid; gap: 0.2rem; }
+.choice-title { font-weight: 600; }
+.choice-text { color: var(--ink-dim); font-size: 0.9375rem; }
+.tag { font-size: 0.75rem; font-weight: 500; color: var(--amber-ink); margin-left: 0.4rem; }
+/* The look: the two choices show what the Kobo will look like. */
+.looks legend { font-weight: 600; margin: 1rem 0 0.75rem; }
+.looks .hint { margin: 0; }
+.choice.look img { width: 100%; height: auto; margin-top: 0.6rem; border-radius: var(--radius-small); }
+@media (prefers-color-scheme: dark) { .choice.look img { filter: invert(0.88) hue-rotate(180deg); } }
+
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-small); margin-bottom: 1rem; overflow: hidden; }
+.segmented label { position: relative; font-weight: 400; cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; }
+.segmented span { display: block; padding: 0.45rem 0.9rem; color: var(--ink-dim); }
+.segmented input:checked + span { background: var(--ink); color: var(--panel); }
+.segmented input:focus-visible + span { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+/* The Hetzner walk-through: a real sequence inside the step. */
+.guide { list-style: none; counter-reset: g; margin: 0 0 1.5rem; padding: 0; }
+.guide > li {
+  counter-increment: g;
+  position: relative;
+  padding: 0 0 1.75rem 2.6rem;
+  border-left: 1px solid var(--line);
+  margin-left: 0.85rem;
+}
+.guide > li:last-child { border-left-color: transparent; padding-bottom: 0.5rem; }
+.guide > li::before {
+  content: counter(g);
+  position: absolute; left: -0.9rem; top: -0.1rem;
+  width: 1.75rem; height: 1.75rem; display: grid; place-items: center;
+  background: var(--ground); border: 1.5px solid var(--track); border-radius: 50%;
+  font-size: 0.8125rem; font-weight: 500; color: var(--ink-dim);
+}
+.guide > li.ok::before { content: "✓"; background: var(--amber); border-color: var(--amber); color: var(--panel); }
+.guide p { color: var(--ink-dim); }
+
+dl.settings { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1.25rem; margin: 0.5rem 0 0.9rem; }
+dl.settings dt { color: var(--ink-dim); }
+dl.settings dd { margin: 0; }
+.record { margin-top: 0.9rem; padding: 0.9rem 1rem; border: 1px dashed var(--track); border-radius: var(--radius-small); }
+
+.copy-box {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-small);
+  padding: 0.45rem 0.45rem 0.45rem 0.8rem; margin: 0.25rem 0 1rem;
+}
+.copy-box code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+
+.notice {
+  background: var(--amber-soft); border-radius: var(--radius-small);
+  padding: 0.8rem 1rem; display: flex; gap: 1rem; align-items: center; justify-content: space-between;
+}
+.banner { background: var(--alarm-soft); color: var(--alarm); padding: 0.8rem 1rem; border-radius: var(--radius-small); }
+
+/* ----------------------------------------------------------- buttons -- */
+button {
+  font: inherit; font-weight: 500; cursor: pointer;
+  border-radius: var(--radius-small); border: 1px solid transparent;
+  padding: 0.65rem 1.2rem;
+}
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+.primary { background: var(--ink); color: var(--panel); }
+.primary:hover:not(:disabled) { background: var(--amber-ink); }
+@media (prefers-color-scheme: dark) { .primary:hover:not(:disabled) { background: var(--amber); color: #14171b; } }
+.secondary { background: var(--panel); color: var(--ink); border-color: var(--track); }
+.secondary:hover:not(:disabled) { border-color: var(--ink); }
+.ghost { background: transparent; color: var(--ink-dim); padding: 0.45rem 0.7rem; }
+.ghost:hover:not(:disabled) { color: var(--ink); }
+.small { padding: 0.35rem 0.75rem; font-size: 0.875rem; flex: none; }
+.voice-preview { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.voice-preview h3 { margin: 0; font-size: 1rem; }
+.voice-preview audio { width: 100%; margin-top: 0.75rem; }
+.voice-warnings { margin: 0.75rem 0 0; padding-left: 1.1rem; color: var(--ink); font-size: 0.9375rem; }
+.voice-warnings:empty { display: none; }
+.voice-warnings li { margin: 0.25rem 0; }
+.voice-warnings li::marker { color: var(--amber); }
+.actions { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.actions.left { justify-content: flex-start; border-top: 0; padding-top: 0; margin-top: 1rem; }
+.actions :only-child { margin-left: auto; }
+.actions.left :only-child { margin-left: 0; }
+
+/* ---------------------------------------------------------- progress -- */
+.progress { margin: 1.5rem 0 0.5rem; }
+.milestones { list-style: none; margin: 0 0 0.75rem; padding: 0; }
+.milestones li { padding: 0.3rem 0 0.3rem 1.8rem; position: relative; color: var(--ink-dim); }
+.milestones li::before {
+  content: ""; position: absolute; left: 0.2rem; top: 0.65rem;
+  width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1.5px solid var(--track);
+}
+.milestones li.active { color: var(--ink); }
+.milestones li.active::before { border-color: var(--amber); border-top-color: transparent; animation: spin 0.8s linear infinite; }
+.milestones li.done { color: var(--ink); }
+.milestones li.done::before { background: var(--amber); border-color: var(--amber); }
+.summary { font-weight: 500; margin-bottom: 0.75rem; }
+.copy-box.tight { margin: 0; padding: 0.25rem 0.25rem 0.25rem 0.6rem; }
+dl.settings dd:has(.copy-box) { min-width: 0; }
+#voice-list .secondary { margin-bottom: 0.5rem; }
+details.log summary { cursor: pointer; color: var(--ink-dim); font-size: 0.875rem; }
+details.log pre {
+  max-height: 16rem; overflow: auto; margin: 0.5rem 0 0;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-small);
+  padding: 0.75rem 0.9rem; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* -------------------------------------------------------------- kobo -- */
+/* The bold moment: the screen's front-light warms as Voxie goes on. */
+.kobo-stage { display: grid; grid-template-columns: 14rem 1fr; gap: 2.5rem; align-items: start; }
+.kobo-stage.hero-art { display: block; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 11rem; gap: 3rem; align-items: start; }
+.frame.no-rail { max-width: 52rem; }
+.frame.no-rail main { max-width: 48rem; }
+.kobo { width: 100%; height: auto; display: block; }
+.kobo .body { fill: var(--device); }
+.kobo .screen { fill: var(--paper); }
+.kobo .lines rect { fill: var(--paper-ink); }
+.kobo .port { fill: #000; opacity: 0.35; }
+.kobo .cable { stroke: var(--track); stroke-width: 6; fill: none; stroke-linecap: round; opacity: 0; transition: opacity 400ms ease; }
+.kobo .glow { opacity: 0; transition: opacity 1200ms ease; }
+.kobo .light-core { stop-color: var(--light-core); }
+.kobo .light-edge { stop-color: var(--light-edge); }
+.kobo .voxie-on-screen { opacity: 0; transition: opacity 600ms ease 400ms; }
+.kobo-stage[data-state="connected"] .cable,
+.kobo-stage[data-state="installing"] .cable,
+.kobo-stage[data-state="done"] .cable { opacity: 1; }
+.kobo-stage[data-state="installing"] .glow { opacity: var(--warmth, 0.15); }
+.kobo-stage[data-state="done"] .glow { opacity: 1; }
+.kobo-stage[data-state="done"] .voxie-on-screen { opacity: 1; }
+.kobo-stage[data-state="idle"] .screen { fill: var(--paper); }
+.kobo-stage[data-state="waiting"] .screen { animation: breathe 3.2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.82; } }
+
+/* -------------------------------------------------------------- done -- */
+.next { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+.next > div { padding-top: 1rem; border-top: 2px solid var(--amber); }
+.next p { color: var(--ink-dim); }
+
+/* ------------------------------------------------------------ narrow -- */
+@media (max-width: 52rem) {
+  .frame, .frame.no-rail { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding-top: 1.5rem; }
+  .rail { position: static; }
+  .rail ol { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 0.25rem; }
+  .rail .label { font-size: 0.875rem; }
+  .rail li:not(.current) .label { display: none; }
+  h1 { font-size: 1.75rem; }
+  .kobo-stage { grid-template-columns: 7rem 1fr; gap: 1.25rem; }
+  .hero { grid-template-columns: minmax(0, 1fr) 5.5rem; gap: 1.25rem; }
+  .next, .pair { grid-template-columns: 1fr; }
+  .notice { flex-direction: column; align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

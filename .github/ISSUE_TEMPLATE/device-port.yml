@@ -1,0 +1,24 @@
+name: Device port
+description: Bring Voxie to another e-reader, or the installer to Windows or Linux.
+labels: [port]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The map and the sync protocol are in docs/SYNC_FORMAT.md; a device only needs to translate its own
+        positions to and from section 3 there. See .github/CONTRIBUTING.md.
+  - type: input
+    id: device
+    attributes:
+      label: Device or platform
+    validations:
+      required: true
+  - type: textarea
+    id: positions
+    attributes:
+      label: How the device records a reading position
+      description: An xpointer, a page number, a percentage, a CFI...
+  - type: textarea
+    id: plan
+    attributes:
+      label: What you plan to build, and what you need from the project

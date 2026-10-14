@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voxie setup</title>
+<link rel="icon" href="/logo/voxie-mark.svg">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<template id="kobo-template">
+  <svg class="kobo" viewBox="0 0 240 380" aria-hidden="true">
+    <defs>
+      <radialGradient id="kobo-light" cx="50%" cy="42%" r="75%">
+        <stop offset="0" class="light-core"/>
+        <stop offset="1" class="light-edge"/>
+      </radialGradient>
+    </defs>
+    <path class="cable" d="M120 318 C120 350 150 352 176 362 C196 370 206 376 214 380"/>
+    <rect class="body" x="20" y="8" width="200" height="312" rx="20"/>
+    <rect class="screen" x="37" y="30" width="166" height="250" rx="3"/>
+    <rect class="glow" x="37" y="30" width="166" height="250" rx="3" fill="url(#kobo-light)"/>
+    <g class="lines">
+      <rect x="57" y="62" width="126" height="5" rx="2"/>
+      <rect x="57" y="77" width="114" height="5" rx="2"/>
+      <rect x="57" y="92" width="122" height="5" rx="2"/>
+      <rect x="57" y="107" width="92" height="5" rx="2"/>
+      <rect x="57" y="132" width="126" height="5" rx="2"/>
+      <rect x="57" y="147" width="106" height="5" rx="2"/>
+      <rect x="57" y="162" width="118" height="5" rx="2"/>
+      <rect x="57" y="177" width="70" height="5" rx="2"/>
+    </g>
+    <image class="voxie-on-screen" href="/logo/voxie-mark.svg" x="98" y="202" width="44" height="44"/>
+    <rect class="port" x="111" y="316" width="18" height="6" rx="2"/>
+  </svg>
+</template>
+<header class="top">
+  <img class="mark" src="/logo/voxie-mark.svg" alt="" width="28" height="28">
+  <span class="brand">Voxie setup</span>
+</header>
+
+<div class="frame">
+  <nav class="rail" aria-label="Setup steps" hidden>
+    <ol>
+      <li data-rail="account"><span class="num">1</span><span class="label">Account</span></li>
+      <li data-rail="server"><span class="num">2</span><span class="label">Server</span></li>
+      <li data-rail="narration"><span class="num">3</span><span class="label">Narration</span></li>
+      <li data-rail="kobo"><span class="num">4</span><span class="label">Kobo</span></li>
+    </ol>
+  </nav>
+
+  <main id="main">
+    <p class="banner" id="session-lost" hidden>This page lost its link to Voxie. Run <code>voxie init</code> again and use the page it opens.</p>
+
+    <!-- Welcome -->
+    <section class="step" data-step="welcome" hidden>
+      <div class="hero">
+        <div>
+      <h1 tabindex="-1">Set up Voxie</h1>
+      <p class="lead">Read a book on your Kobo, keep going as an audiobook on your phone, and come back to the page where the audio stopped. Setting it up takes about ten minutes.</p>
+      <h2 class="minor">Have these ready</h2>
+      <ul class="needs">
+        <li><strong>Your Kobo</strong> and its USB cable.</li>
+        <li><strong>A server.</strong> We will help you rent a small one at Hetzner, about €5 a month, or you can use one you already run.</li>
+        <li><strong>A RunPod account</strong>, if you want the best voices. You can also narrate for free on this Mac.</li>
+      </ul>
+        </div>
+        <div class="kobo-stage hero-art" data-state="idle"><div class="kobo-slot"></div></div>
+      </div>
+      <div class="actions">
+        <button class="primary" data-go="account">Start</button>
+      </div>
+    </section>
+
+    <!-- 1. Account -->
+    <section class="step" data-step="account" hidden>
+      <h1 tabindex="-1">Choose your login</h1>
+      <p class="lead">Your Kobo and the Audiobookshelf app on your phone sign in with it. It stays on your own server.</p>
+      <form id="account-form" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+          <p class="error" data-error-for="username" role="alert"></p>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="with-toggle">
+            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8">
+            <button type="button" class="ghost toggle" data-toggle="password" aria-pressed="false">Show</button>
+          </div>
+          <p class="hint" id="password-hint">At least 8 characters.</p>
+          <p class="error" data-error-for="password" role="alert"></p>
+        </div>
+        <label class="check" id="keep-password-row" hidden>
+          <input type="checkbox" id="keep-password"> Keep my current password
+        </label>
+        <div class="actions">
+          <button type="button" class="ghost" data-go="welcome">Back</button>
+          <button class="primary" type="submit">Continue</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 2. Server -->
+    <section class="step" data-step="server" hidden>
+      <h1 tabindex="-1">Your server</h1>
+      <p class="lead">A small computer that is always on, so your Kobo and your phone stay in sync wherever you are.</p>
+
+      <p class="notice" id="keep-server" hidden>
+        Voxie already has a server. Keep it, or set it up again below (this also updates it).
+        <button type="button" class="secondary small" id="keep-server-btn">Keep my server</button>
+      </p>
+      <fieldset class="choices" id="server-choice">
+        <legend class="visually-hidden">Which server</legend>
+        <label class="choice">
+          <input type="radio" name="server-mode" value="new" checked>
+          <span class="choice-body">
+            <span class="choice-title">Rent one at Hetzner <span class="tag">Recommended</span></span>
+            <span class="choice-text">About €5 a month. Voxie installs everything on it for you.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="server-mode" value="existing">
+          <span class="choice-body">
+            <span class="choice-title">I already run a Voxie server</span>
+            <span class="choice-text">At home or anywhere else: its address, and its login if you have one.</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div id="server-new">
+        <ol class="guide">
+          <li>
+            <h2>This Mac's key</h2>
+            <p>Hetzner lets only this key in, so no password ever travels.</p>
+            <div id="key-present" hidden>
+              <div class="copy-box"><code id="ssh-key"></code><button type="button" class="ghost" data-copy="ssh-key">Copy</button></div>
+            </div>
+            <div id="key-missing" hidden>
+              <button type="button" class="secondary" id="make-key">Create a key</button>
+              <p class="error" id="make-key-error" role="alert"></p>
+            </div>
+          </li>
+          <li>
+            <h2>Create the server</h2>
+            <p><a id="hetzner-link" href="#" target="_blank" rel="noopener">Open Hetzner Cloud</a>, make an account, then <em>Add Server</em> with:</p>
+            <dl class="settings">
+              <dt>Location</dt><dd>Any</dd>
+              <dt>Image</dt><dd>Ubuntu 24.04</dd>
+              <dt>Type</dt><dd>Shared vCPU, the cheapest one</dd>
+              <dt>SSH keys</dt><dd><em>Add SSH key</em>, paste the key above</dd>
+            </dl>
+            <p>When it is running, copy its IPv4 address.</p>
+          </li>
+          <li>
+            <h2>Connect to it</h2>
+            <div class="field inline">
+              <label for="server-ip">IPv4 address</label>
+              <div class="row">
+                <input id="server-ip" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="91.99.12.34">
+                <button type="button" class="secondary" id="ssh-check">Connect</button>
+              </div>
+              <p class="status" id="ssh-status" role="status"></p>
+            </div>
+          </li>
+          <li>
+            <h2>Your own domain <span class="optional">optional</span></h2>
+            <p>With a domain (about €10 a year at any registrar), your login and reading positions travel encrypted, and moving to another server later does not mean plugging the Kobo in again.</p>
+            <div class="field inline">
+              <label for="domain">Domain</label>
+              <div class="row">
+                <input id="domain" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="voxie.example.com">
+                <button type="button" class="secondary" id="dns-check">Check</button>
+              </div>
+              <p class="status" id="dns-status" role="status"></p>
+              <div id="dns-record" class="record" hidden>
+                <p>At your registrar, add this record, then press Check again:</p>
+                <dl class="settings">
+                  <dt>Type</dt><dd><code>A</code></dd>
+                  <dt>Name</dt><dd><code id="dns-name"></code></dd>
+                  <dt>Value</dt><dd><code id="dns-value"></code></dd>
+                </dl>
+              </div>
+            </div>
+          </li>
+        </ol>
+        <div class="progress" id="server-progress" hidden>
+          <p class="summary" id="server-summary"></p>
+          <ol class="milestones" id="server-milestones"></ol>
+          <details class="log"><summary>Details</summary><pre id="server-log"></pre></details>
+          <p class="error" id="server-error" role="alert"></p>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" data-go="account">Back</button>
+          <button type="button" class="primary" id="server-install" disabled>Set up the server</button>
+        </div>
+      </div>
+
+      <div id="server-existing" hidden>
+        <form id="existing-form" novalidate>
+          <div class="field">
+            <label for="existing-address">Server address</label>
+            <input id="existing-address" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://voxie.example.com">
+            <p class="hint">An https:// address, or an IP address for plain http.</p>
+            <p class="error" data-error-for="address" role="alert"></p>
+          </div>
+          <div class="field">
+            <label for="existing-ssh">Server login <span class="optional">recommended</span></label>
+            <input id="existing-ssh" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="root@203.0.113.10">
+            <p class="hint">With it, Voxie does the server's part itself: you type nothing on the server, and no Audiobookshelf key is needed. It uses this computer's SSH key.</p>
+            <p class="error" data-error-for="ssh" role="alert"></p>
+          </div>
+          <div class="field">
+            <label for="abs-key">Audiobookshelf API key <span class="optional">without a login</span></label>
+            <input id="abs-key" type="password" autocomplete="off" spellcheck="false">
+            <p class="hint">In Audiobookshelf: Settings, API Keys, Create API Key.</p>
+            <p class="error" data-error-for="absKey" role="alert"></p>
+          </div>
+          <div class="actions">
+            <button type="button" class="ghost" data-go="account">Back</button>
+            <button class="primary" type="submit">Check and save</button>
+          </div>
+        </form>
+        <div id="existing-done" hidden>
+          <p>Saved. On the server, add this line to its <code>.env</code> and run <code>docker compose up -d</code>:</p>
+          <div class="copy-box"><code id="env-line"></code><button type="button" class="ghost" data-copy="env-line">Copy</button></div>
+          <p>Then create your account there, once:</p>
+          <div class="copy-box"><code id="add-user"></code><button type="button" class="ghost" data-copy="add-user">Copy</button></div>
+          <label class="check"><input type="checkbox" id="existing-confirm"> I ran both on the server</label>
+          <div class="actions">
+            <button type="button" class="primary" id="existing-continue" disabled>Continue</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Narration -->
+    <section class="step" data-step="narration" hidden>
+      <h1 tabindex="-1">How should your books be read?</h1>
+      <p class="lead">Drop an EPUB in a folder on this Mac; Voxie narrates it and sends the audiobook to your server.</p>
+
+      <fieldset class="choices" id="narration-choice">
+        <legend class="visually-hidden">Narration</legend>
+        <label class="choice">
+          <input type="radio" name="narration" value="runpod" checked>
+          <span class="choice-body">
+            <span class="choice-title">On RunPod <span class="tag">Recommended</span></span>
+            <span class="choice-text">A rented GPU reads in a voice you choose. A 16-hour novel took 75 minutes and cost $0.83.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="narration" value="kokoro">
+          <span class="choice-body">
+            <span class="choice-title">On this Mac, free</span>
+            <span class="choice-text">Preset voices, no account. A novel takes about a night.</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div id="runpod-fields">
+        <div class="field" id="runpod-key-field">
+          <label for="runpod-key">RunPod API key</label>
+          <input id="runpod-key" type="password" autocomplete="off" spellcheck="false">
+          <p class="hint"><a id="runpod-link" href="#" target="_blank" rel="noopener">Make a RunPod account</a>, then Settings, API Keys, Create API Key.</p>
+          <p class="error" data-error-for="runpod" role="alert"></p>
+        </div>
+        <label class="check" id="keep-runpod-row" hidden><input type="checkbox" id="keep-runpod" checked> Keep my current RunPod key</label>
+        <div class="field" id="template-field" hidden>
+          <label for="template-id">RunPod template id</label>
+          <input id="template-id" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field" id="openrouter-key-field">
+          <label for="openrouter-key">OpenRouter key <span class="optional">the voice director, recommended</span></label>
+          <input id="openrouter-key" type="password" autocomplete="off" spellcheck="false">
+          <p class="hint">The voice director reads each scene and tells the narrator how to say every paragraph: hushed, frantic, tender. About $0.10 a novel. <a id="openrouter-link" href="#" target="_blank" rel="noopener">Make an OpenRouter account</a>, then Keys, Create Key.</p>
+          <p class="error" data-error-for="openrouter" role="alert"></p>
+        </div>
+        <label class="check" id="keep-openrouter-row" hidden><input type="checkbox" id="keep-openrouter" checked> Keep my current OpenRouter key</label>
+        <p class="fine" id="disclosure"></p>
+      </div>
+
+      <p class="notice" id="docker-notice" hidden>
+        Docker Desktop is not running. Narration on this Mac uses it to match every word to the text.
+        <button type="button" class="secondary small" data-open-docker>Open Docker</button>
+      </p>
+      <p class="error" id="narration-error" role="alert"></p>
+
+      <div id="voice-block" hidden>
+        <h2>Your narrator's voice</h2>
+        <div id="voice-list" hidden>
+          <p class="status" id="voice-added" role="status"></p>
+          <p>Your voices: <span id="voice-names"></span>.</p>
+          <button type="button" class="secondary small" id="voice-more">Add another voice</button>
+        </div>
+        <div id="voice-form-wrap">
+          <p>No voice comes with Voxie. Use 8 to 15 seconds of someone speaking clearly: your own voice, or someone who agreed to it.</p>
+          <p class="hint">The clip's mood becomes the narrator's: calm, clear, one voice only, no laughs, sighs or music.</p>
+          <form id="voice-form" novalidate>
+            <div class="segmented" role="radiogroup" aria-label="Where the clip comes from">
+              <label><input type="radio" name="voice-source" value="url" checked><span>A YouTube link</span></label>
+              <label><input type="radio" name="voice-source" value="file"><span>A file</span></label>
+            </div>
+            <div class="field" id="voice-url-field">
+              <label for="voice-url">Link</label>
+              <input id="voice-url" type="url" placeholder="https://youtu.be/…?t=90" autocomplete="off">
+            </div>
+            <div class="field" id="voice-file-field" hidden>
+              <label for="voice-file">Audio or video file</label>
+              <input id="voice-file" type="file" accept="audio/*,video/*">
+            </div>
+            <div class="pair">
+              <div class="field"><label for="voice-start">Starts at</label><input id="voice-start" placeholder="1:30" inputmode="numeric"></div>
+              <div class="field"><label for="voice-end">Ends at</label><input id="voice-end" placeholder="1:42" inputmode="numeric"></div>
+            </div>
+            <div class="field">
+              <label for="voice-text">Exactly what is said</label>
+              <textarea id="voice-text" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label for="voice-name">Name</label>
+              <input id="voice-name" value="my voice">
+            </div>
+            <fieldset class="consent">
+              <legend>Whose voice is it?</legend>
+              <label class="check"><input type="radio" name="consent" value="self"> My own</label>
+              <label class="check"><input type="radio" name="consent" value="permission"> Someone who agreed to be cloned</label>
+            </fieldset>
+            <div class="progress" id="voice-progress" hidden>
+              <p class="status" id="voice-status" role="status"></p>
+            </div>
+            <p class="error" id="voice-error" role="alert"></p>
+            <div class="actions left">
+              <button class="secondary" type="submit" id="voice-add">Check this clip</button>
+            </div>
+          </form>
+          <div class="voice-preview" id="voice-preview" hidden>
+            <h3>Listen before you keep it</h3>
+            <p class="hint">This is the clip the narrator will copy, trimmed to the words you typed.</p>
+            <audio id="voice-audio" controls preload="auto"></audio>
+            <ul class="voice-warnings" id="voice-warnings"></ul>
+            <p class="error" id="voice-keep-error" role="alert"></p>
+            <div class="actions left">
+              <button type="button" id="voice-keep">Keep this voice</button>
+              <button type="button" class="secondary" id="voice-again">Try another clip</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="ghost" data-go="server">Back</button>
+        <button type="button" class="primary" id="narration-save">Save and continue</button>
+      </div>
+    </section>
+
+    <!-- 4. Kobo -->
+    <section class="step" data-step="kobo" hidden>
+      <h1 tabindex="-1">Connect your Kobo</h1>
+      <div class="kobo-stage">
+        <div class="kobo-slot"></div>
+        <div class="kobo-side">
+          <p class="lead" id="kobo-lead">Plug your Kobo into this Mac with its cable, and tap <strong>Connect</strong> on its screen.</p>
+          <p class="status" id="kobo-status" role="status"></p>
+          <p class="notice" id="kobo-docker" hidden>
+            Docker Desktop is not running. Voxie uses it to check the Kobo's storage before writing anything to it.
+            <button type="button" class="secondary small" data-open-docker>Open Docker</button>
+          </p>
+          <div class="progress" id="kobo-progress" hidden>
+            <ol class="milestones" id="kobo-milestones"></ol>
+            <details class="log"><summary>Details</summary><pre id="kobo-log"></pre></details>
+          </div>
+          <fieldset class="choices looks" id="kobo-look" hidden>
+            <legend>Last step: how reading on your Kobo looks</legend>
+            <label class="choice look">
+              <input type="radio" name="look" value="kobo" checked>
+              <span class="choice-body">
+                <span class="choice-title">Like a Kobo <span class="tag">Recommended</span></span>
+                <span class="choice-text">A home screen with your books, tabs along the bottom, and the Kobo's reading page with its toolbar.</span>
+                <img src="/static/look-kobo.png" width="544" height="366" alt="The Kobo look: a home screen of covers with the tabs Home, My Books, Discover and More, and a page with the chapter above the text and the book below it.">
+              </span>
+            </label>
+            <label class="choice look">
+              <input type="radio" name="look" value="koreader">
+              <span class="choice-body">
+                <span class="choice-title">Like KOReader</span>
+                <span class="choice-text">KOReader as it ships: your recent books as covers, and every menu in reach.</span>
+                <img src="/static/look-koreader.png" width="544" height="366" alt="KOReader's own look: a grid of recently read covers, and a page with KOReader's status bar.">
+              </span>
+            </label>
+            <p class="hint">Change it any time: plug the Kobo in and run <code>voxie look kobo</code> or <code>voxie look koreader</code>.</p>
+          </fieldset>
+          <p class="error" id="kobo-error" role="alert"></p>
+          <div class="actions left">
+            <button type="button" class="primary" id="kobo-install" hidden>Install Voxie on this Kobo</button>
+          </div>
+        </div>
+      </div>
+      <div id="kobo-not-mac" hidden>
+        <p class="lead">The one-cable Kobo setup runs on a Mac. On this computer, any KOReader device pairs with a few settings: run <code>voxie device-settings</code> and follow <code>docs/KOREADER_DEVICES.md</code>.</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="ghost" data-go="narration" id="kobo-back">Back</button>
+        <button type="button" class="ghost" id="kobo-skip">Skip for now</button>
+      </div>
+    </section>
+
+    <!-- Done -->
+    <section class="step" data-step="done" hidden>
+      <div class="hero">
+        <div>
+          <h1 tabindex="-1">Voxie is ready</h1>
+          <p class="lead" id="done-lead">Unplug your Kobo. It restarts with a <strong>Voxie</strong> button in its bottom bar.</p>
+        </div>
+        <div class="kobo-stage hero-art" data-state="done" id="done-art"><div class="kobo-slot"></div></div>
+      </div>
+      <div class="next">
+        <div>
+          <h2>Add your first book</h2>
+          <p>Drop an EPUB into the Kobo_Dropzone folder. It reaches your Kobo in a few minutes, through the Voxie button, and the audiobook follows when it is narrated.</p>
+          <p class="hint">Every book you drop is then kept in <strong>Kobo_Archive</strong>. Keep it: to give an ebook-only book its audiobook later, or narrate one again, drop the same file back in from there.</p>
+          <button type="button" class="secondary" id="open-dropzone">Open Kobo_Dropzone</button>
+        </div>
+        <div>
+          <h2>Listen on your phone</h2>
+          <p>Install an Audiobookshelf app (on iPhone, ShelfPlayer or Plappa; on Android, Audiobookshelf) and sign in:</p>
+          <dl class="settings">
+            <dt>Server</dt><dd><div class="copy-box tight"><code id="done-abs"></code><button type="button" class="ghost small" data-copy="done-abs">Copy</button></div></dd>
+            <dt>Username</dt><dd><code id="done-user"></code></dd>
+            <dt>Password</dt><dd>the one you chose</dd>
+          </dl>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="finish">Close setup</button>
+      </div>
+      <p class="status" id="finish-status" role="status"></p>
+      <p class="fine">When a new version of Voxie changes the Kobo's part, plug the Kobo in and open setup again (<code>voxie init</code>): everything you entered is remembered.</p>
+      <p class="fine">Voxie is free and lives on donations. If it is useful to you, <a id="donate-link" href="#" target="_blank" rel="noopener">support it on Ko-fi</a>.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

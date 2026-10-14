@@ -1,0 +1,48 @@
+{
+  "about": "The landing rules' examples. tools/test_landing.py runs them against core/landing.py and tools/test_landing.lua against librarian_sync.koplugin/voxie_landing.lua: one file, so the gateway and the device cannot drift. Times in seconds.",
+  "chunk_rows": [["001_A_One.mp3", 50.0], ["002_B_One.mp3", 50.0], ["003_A_Two.mp3", 100.0], ["004_A_Three.mp3", 100.0], ["005_A_Four.mp3", 100.0]],
+  "map": {
+    "chapters": [["One", 0.0, 100.0], ["Two", 100.0, 200.0], ["Three", 200.0, 300.0], ["Four", 300.0, 400.0]],
+    "nodes": [
+      ["/body/DocFragment[3]/body/p[1]", 0.0, 20.0],
+      ["/body/DocFragment[3]/body/p[2]", 20.0, 50.0],
+      ["/body/DocFragment[3]/body/p[10]", 50.0, 80.0],
+      ["/body/DocFragment[3]/body/p[10]", 80.0, 100.0],
+      ["/body/DocFragment[3]/body/p[20]", 100.0, 130.0],
+      ["/body/DocFragment[3]/body/p[21]", 130.0, 200.0],
+      ["/body/DocFragment[4]/body/p[1]", 200.3, 260.0],
+      ["/body/DocFragment[4]/body/p[2]", 260.0, 299.8],
+      ["/body/DocFragment[5]/body/p[1]", 299.8, 300.5],
+      ["/body/DocFragment[5]/body/p[2]", 300.5, 400.0]
+    ]
+  },
+  "to_page": [
+    {"seconds": 0.0, "position": "/body/DocFragment[3]/body/p[1]", "why": "the very start"},
+    {"seconds": 40.0, "position": "/body/DocFragment[3]/body/p[2]", "why": "3 s back is still the paragraph being heard"},
+    {"seconds": 51.0, "position": "/body/DocFragment[3]/body/p[2]", "why": "1 s into a paragraph: 3 s back is the one before"},
+    {"seconds": 85.0, "position": "/body/DocFragment[3]/body/p[10]", "why": "the second chunk of a split paragraph is still that paragraph"},
+    {"seconds": 99.0, "position": "/body/DocFragment[3]/body/p[10]", "why": "the end of a chapter"},
+    {"seconds": 101.0, "position": "/body/DocFragment[3]/body/p[20]", "why": "1 s into a chapter: never the previous chapter's last page"},
+    {"seconds": 160.0, "position": "/body/DocFragment[3]/body/p[21]", "why": "mid-chapter"},
+    {"seconds": 200.1, "position": "/body/DocFragment[3]/body/p[21]", "why": "the new chapter's first paragraph has not started yet"},
+    {"seconds": 201.0, "position": "/body/DocFragment[4]/body/p[1]", "why": "a chapter whose first paragraph starts 0.3 s late"},
+    {"seconds": 262.0, "position": "/body/DocFragment[4]/body/p[1]", "why": "2 s into a paragraph: 3 s back is the one before"},
+    {"seconds": 263.5, "position": "/body/DocFragment[4]/body/p[2]", "why": "3.5 s into a paragraph"},
+    {"seconds": 303.0, "position": "/body/DocFragment[5]/body/p[1]", "why": "a chapter whose first paragraph starts 0.2 s early (rounding) still opens on it"},
+    {"seconds": 999.0, "position": "/body/DocFragment[5]/body/p[2]", "why": "past the end: the last paragraph"}
+  ],
+  "to_audio": [
+    {"position": "/body/DocFragment[3]/body/p[10]/em/span[1]/text().3", "percentage": 0.3, "seconds": 50.0, "from_map": true, "why": "a page that starts inside inline markup finds its paragraph"},
+    {"position": "/body/DocFragment[3]/body/p[10]/span[2]/text().9", "percentage": 0.3, "seconds": 50.0, "from_map": true, "why": "a split paragraph means its start"},
+    {"position": "/body/DocFragment[3]/body/p[21]", "percentage": 0.5, "seconds": 130.0, "from_map": true, "why": "a paragraph with no offset"},
+    {"position": "point(/1/body/DocFragment[4]/body/p[2])", "percentage": 0.9, "seconds": 260.0, "from_map": true, "why": "the stored form of a path"},
+    {"position": "/body/DocFragment[3]/body/p[99]/span[1]/text().0", "percentage": 0.25, "seconds": 100.0, "from_map": false, "why": "a page the map does not know: the same fraction of the audiobook"}
+  ],
+  "chapter_at": [
+    {"seconds": 0.0, "chapter": 1, "offset": 0.0},
+    {"seconds": 99.5, "chapter": 1, "offset": 99.5},
+    {"seconds": 100.0, "chapter": 2, "offset": 0.0},
+    {"seconds": 230.0, "chapter": 3, "offset": 30.0},
+    {"seconds": 999.0, "chapter": 4, "offset": 699.0}
+  ]
+}

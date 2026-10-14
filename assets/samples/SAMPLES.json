@@ -1,0 +1,12 @@
+{
+ "the-yellow-wallpaper-kokoro.mp3": {
+  "scene": "the ending",
+  "made_with": "Kokoro-82M on a laptop's CPU, preset voice af_heart",
+  "voice_consent": "preset"
+ },
+ "the-yellow-wallpaper-recommended.mp3": {
+  "scene": "the ending",
+  "made_with": "CosyVoice 3 on RunPod, directed by JEV (the eight native deliveries), in the maintainer's own voice",
+  "voice_consent": "self"
+ }
+}

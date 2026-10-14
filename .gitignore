@@ -1,0 +1,77 @@
+# OS Junk
+.DS_Store
+Thumbs.db
+
+# Python & Environment
+__pycache__/
+*.pyc
+.env
+# a timestamped .env backup is still a plaintext key file
+.env.bak*
+*.egg-info/
+
+# The User's Private Library (Never upload these!)
+library/
+incoming/
+archive/
+config/
+data/
+metadata/
+training_lab/
+whisper_dump/
+
+# Machine Learning Training Data (Keep the models, ignore the heavy raw data)
+training_lab/raw_data/
+*.csv
+*.zip
+*.epub
+*.azw3
+
+# Ignore audio factory files
+mfa_workspace/
+*.wav
+*.mp3
+# Voice recordings (voice-add's sources) never enter the repo.
+*.m4a
+# The README's samples (public-domain text): the only audio in the repo.
+!assets/samples/*.mp3
+*.json
+# Benchmark results: measurements, no secrets (tools/gpu_bench.py drops pod ids).
+!docs/measurements/*.json
+# ...except the dictionary manifest, which is source: it pins what reaches a device.
+!libra_cli/dictionaries.json
+!libra_cli/fonts.json
+# ...and the landing rules' examples, which the Python and the Lua are both tested against.
+!tools/landing_examples.json
+# Which voice made each README sample, and its consent (tools/leak_scan.py).
+!assets/samples/SAMPLES.json
+# ...and FLOSS/fund's donation manifest, which crawlers read at the repo root.
+!funding.json
+# ...and the test harness's baselines, which may only go up (docs/TESTING.md).
+!tools/coverage_baseline.json
+!tools/mutation_baseline.json
+
+# buildx build records downloaded from CI runs.
+*.dockerbuild/
+
+# CosyVoice test harness outputs
+cosy_out/
+
+# Working directories for the measuring tools. Everything in them is either
+# generated audio or a slice of a book's text, which is exactly what must not
+# reach a repo that is headed for public release -- mfa_verify/ put three
+# passages of a copyrighted novel into commit 88f424e before this line existed.
+sweep_output/
+mfa_verify/
+
+# Generated benchmark/verification passages. These hold the actual text of a
+# book (tools extract it from the narration plan), so they are book content
+# rather than source -- and this repo is headed for public release.
+tools/_sweep_passages.json
+tools/_verify_passages.json
+
+# Decision reports carry a book's text (tools/decision_report.py). Never commit them.
+reports/
+
+# The public export's private word list (tools/leak_scan.py): never committed.
+.export-deny

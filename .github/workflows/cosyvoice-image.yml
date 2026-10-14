@@ -1,0 +1,200 @@
+name: Build CosyVoice TTS image
+
+# Builds the prebuilt CosyVoice3 serving environment and pushes it to GHCR, so
+# the RunPod pod stops cloning a repo, building a whisper sdist and resolving a
+# full requirements.txt on a billing GPU every time it boots (3.5-5 minutes when
+# the network behaves, and a pod billing for nothing when it does not).
+#
+# The same argument as the Voxtral image, with one addition: horizontal scaling
+# means five pods each taking that risk independently.
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "cu121 = the proven image; vllm = cu128 + batching (experimental)"
+        type: choice
+        options: [cu121, vllm]
+        default: cu121
+  push:
+    tags:
+      - "cosyvoice-v*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/cosyvoice-tts
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A GitHub runner starts with roughly 14GB free and this image is well
+      # past that. Dropping the preinstalled toolchains frees another 25-30GB,
+      # which is the difference between finishing and dying on "no space left
+      # on device" forty minutes in. :3.3 bakes 5.42GB of model weights on top
+      # of everything else, so the margin here matters more than it did --
+      # the step prints before/after precisely so a future failure is read as
+      # "the runner ran out of room" rather than as a build error.
+      - name: Free disk space
+        run: |
+          echo "before:"; df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache \
+                      /usr/local/share/powershell /usr/share/swift \
+                      /usr/local/share/chromium /usr/local/lib/node_modules \
+                      /opt/az /usr/share/miniconda || true
+          sudo apt-get clean || true
+          # The vLLM variant adds torch 2.8 + vllm on top of 5.42GB of weights
+          # and a ~1GB baked checkpoint, so the margin that was comfortable for
+          # :3.3 is not comfortable here.
+          sudo rm -rf /usr/local/graalvm /usr/local/share/boost /usr/lib/jvm \
+                      /usr/local/julia* /opt/pipx /usr/share/sbt /usr/local/n || true
+          sudo apt-get purge -y --allow-remove-essential --ignore-hold \
+              '^llvm-.*' '^php.*' '^mongodb-.*' azure-cli google-chrome-stable \
+              firefox powershell mono-devel 2>/dev/null || true
+          sudo apt-get autoremove -y || true
+          sudo docker builder prune --all --force || true
+          # / is the only disk on this runner image. An earlier attempt moved
+          # Docker to /mnt on the belief that it was a second, larger volume:
+          # `df -h / /mnt` prints /dev/root twice, so that bought exactly
+          # nothing and cost two 26-minute builds to disprove.
+          sudo docker image prune --all --force || true
+          echo "after:"; df -h / | tail -1
+
+      # 50GB free on / was not enough: the vLLM image died in "exporting
+      # layers" after 561s with "no space left on device", because buildkit
+      # needs the uncompressed layers AND the compressed export at once --
+      # roughly twice the image. A GitHub runner has a second, larger disk at
+      # /mnt that is otherwise unused, so Docker is moved onto it rather than
+      # the image being made smaller. Nothing here is fat: torch+vllm is ~10GB
+      # of that and the model weights are 5.4GB of it by design.
+      # One Dockerfile, two images. Everything that differs is a build arg, so
+      # the proven path cannot drift while the experimental one is worked on --
+      # and a tag push, where `variant` is empty, always builds cu121.
+      - name: Resolve variant
+        id: v
+        run: |
+          if [ "${{ inputs.variant }}" = "vllm" ]; then
+            # 4.3: 4.2 (the pod's dead man's switch, server/idle_watchdog.py)
+            # built from the public repository, so the image anyone pulls
+            # matches source anyone can read. A new tag, never 4.2 rebuilt: the
+            # public template runs 4.2 until it is repointed on purpose.
+            echo "tag=4.3" >> "$GITHUB_OUTPUT"
+            # NOT tagged :latest. latest is what someone reaches for when they
+            # want the working image, and this one has never narrated a book.
+            echo "extra_tag=" >> "$GITHUB_OUTPUT"
+            {
+              echo 'args<<ARGS'
+              echo 'CUDA_BASE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04'
+              echo 'NVCC_PKG=cuda-nvcc-12-8'
+              echo 'VLLM_SPEC=vllm==0.11.0'
+              echo 'TRANSFORMERS_SPEC=transformers==4.57.1'
+              echo 'TORCH_INDEX=https://pypi.org/simple'
+              echo 'EXPECT_TORCH=2.8'
+              echo 'EXPECT_CUDA=12.8'
+              # The one concession to the runner. torch+vllm is ~10GB on its
+              # own, and buildkit needs the uncompressed layers AND the
+              # compressed export at once -- with the weights baked that is
+              # past 50GB and the build dies at the last step. The pod fetches
+              # them at boot instead (cosyvoice-weights ensure, ~90s with
+              # hf_transfer) and converts the vLLM checkpoint on first load.
+              # Costs boot time on a variant that exists to be MEASURED, and
+              # the gate's boot term is already measured from :3.3. Bake them
+              # back once the rate clears.
+              echo 'BAKE_WEIGHTS=0'
+              # The private template's settings (Dockerfile, last ENV): the
+              # public template carries none, and LOAD_VLLM=0 here babbles.
+              echo 'LOAD_VLLM=1'
+              echo 'GEN_CONCURRENCY=16'
+              echo 'VLLM_GPU_UTIL=0.5'
+              echo 'ARGS'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=3.4" >> "$GITHUB_OUTPUT"
+            echo "extra_tag=${{ env.IMAGE }}:latest" >> "$GITHUB_OUTPUT"
+            printf 'args<<ARGS\nARGS\n' >> "$GITHUB_OUTPUT"
+          fi
+          echo "built variant: ${{ inputs.variant || 'cu121' }}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The rule above, enforced: a tag that already exists is never pushed
+      # again. Forgetting to raise the tag once would have replaced the image
+      # under the public template, unannounced.
+      - name: Refuse a tag that exists
+        run: |
+          if docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.v.outputs.tag }}" >/dev/null 2>&1; then
+            echo "::error::${{ env.IMAGE }}:${{ steps.v.outputs.tag }} exists. Raise the tag in 'Resolve variant'."
+            exit 1
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # Repo root, not docker/cosyvoice: the image COPYs
+          # server/custom_api.py so the server it runs is the one in this repo,
+          # which is what stops the pod and the source drifting apart the way
+          # the hand-pasted gist can.
+          context: .
+          file: docker/cosyvoice/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: ${{ steps.v.outputs.args }}
+          # 4.1 and 3.4 start themselves (docker/cosyvoice/start.sh: the log page
+          # on 8001, then the server), so a template needs no start command.
+          # 4.0 is cu128 + vLLM (Blackwell + batching, unproven); 3.3 bakes the
+          # model weights in; 3.2 added /profile; 3.1 added Montreal Forced
+          # Aligner.
+          # Deliberately NOT overwriting an existing tag -- the live RunPod
+          # template runs one of these, so republishing it would put an
+          # untested image under every book the moment this workflow finished,
+          # with no way back other than another build. A new tag means the
+          # template is repointed on purpose, once the image has served.
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.v.outputs.tag }}
+            ${{ steps.v.outputs.extra_tag }}
+          # GHCR links the package to the repository that built it, so the
+          # image page leads to its source.
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+          # No cache-from/to: the layers are huge and GitHub's cache would evict
+          # them between runs anyway, so it buys nothing but complexity.
+          provenance: false
+
+      # Runs even when the build fails, because the last failure produced no
+      # usable log: the agent ran out of room writing its own diagnostics, so
+      # the one question worth answering -- which filesystem filled -- was
+      # unanswerable afterwards.
+      - name: Disk after the build
+        if: always()
+        run: |
+          df -h / /mnt || true
+          sudo du -sh /mnt/docker 2>/dev/null || true
+
+      - name: Report what was pushed
+        run: |
+          echo "pushed ${{ env.IMAGE }}:${{ steps.v.outputs.tag }}"
+          echo
+          echo "This tag carries the weights. A RunPod template pointed at it"
+          echo "must still exist and be selected in .env -- the image alone"
+          echo "changes nothing until RUNPOD_TEMPLATE_ID names a template that"
+          echo "runs it."
+          echo
+          echo "The package is PRIVATE by default. Make it public once, at:"
+          echo "  https://github.com/users/${{ github.repository_owner }}/packages/container/cosyvoice-tts/settings"
+          echo "Private packages bill storage AND egress, and every cold RunPod"
+          echo "machine pulls this image -- so leaving it private gets expensive."
+          echo "The image holds CosyVoice, public model weights and this repo's"
+          echo "custom_api.py; nothing secret. TTS_API_TOKEN is read from the"
+          echo "pod environment at runtime, never baked in."

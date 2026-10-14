@@ -1,0 +1,53 @@
+name: Fault injection
+
+# Layer 3 (docs/TESTING.md): the GPU route when things go wrong. The real
+# engine against a fake RunPod and fake narration pods on the runner
+# (tools/chaos/fakes.py) that never boot, die mid-book, answer 503, bill over
+# their ceiling, ignore the token, or lose their engine to kill -9. No key, no
+# paid service. tools/chaos/run.py says what each scenario proves.
+#
+# About 15 minutes (MFA in Docker aligns every scenario's book), so not on
+# every push: nightly, by hand, and on a pull request labelled `chaos`.
+on:
+  schedule:
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  scenarios:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'chaos')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: System tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
+
+      # The engine makes a KEPUB of every book. kepubify 4.0.4, pinned by its
+      # sha256 exactly as install.sh pins it.
+      - name: kepubify
+        run: |
+          curl -fsSL -o /tmp/kepubify https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit
+          echo "37d7628d26c5c906f607f24b36f781f306075e7073a6fe7820a751bb60431fc5  /tmp/kepubify" | sha256sum -c -
+          sudo install -m 755 /tmp/kepubify /usr/local/bin/kepubify
+
+      # CPU torch first: the default Linux wheel brings ~2.5 GB of CUDA.
+      - name: Python dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Every scenario
+        run: python -u tools/chaos/run.py

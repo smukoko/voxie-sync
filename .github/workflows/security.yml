@@ -1,0 +1,45 @@
+name: Security
+
+# Layer 4 of docs/TESTING.md, the automated half. On every pull request:
+#   - bandit: Python security lint; any finding of medium severity or higher
+#     fails. A false positive is annotated in the code with its reason
+#     (`# nosec Bxxx: why`), never silenced in bulk here.
+#   - pip-audit: known vulnerabilities in the pinned dependencies.
+#   - gitleaks: secrets in this pull request's own commits. Only those: the
+#     private repository's old history holds keys that were rotated long ago,
+#     and the public export starts from a fresh history.
+# The attack on the gateway itself (tools/test_security_gateway.py) runs with
+# every other test in tests.yml.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Tools
+        run: pip install bandit pip-audit
+      - name: bandit (medium severity and up)
+        run: bandit -q -r core libra_cli server librerian_engine_v3.py librerian_gateway_v3.py mac_ghost.py -ll
+      - name: pip-audit, the gateway (pinned, deployed on servers)
+        run: pip-audit -r requirements-gateway.txt
+      - name: pip-audit, the engine
+        run: pip-audit -r requirements.txt
+      - name: gitleaks, this pull request's commits
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 git /repo \
+            --log-opts="origin/${{ github.base_ref }}..HEAD" --no-banner --redact --exit-code 1

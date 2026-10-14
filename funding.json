@@ -1,0 +1,45 @@
+{
+    "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+    "version": "v1.1.0",
+    "entity": {
+        "type": "individual",
+        "role": "maintainer",
+        "name": "Sacre Mukoko",
+        "email": "s.mukoko@proton.me",
+        "description": "Maintainer of Voxie, an open-source tool that turns DRM-free EPUBs into AI-narrated audiobooks and keeps the reading and listening positions in sync.",
+        "webpageUrl": {
+            "url": "https://github.com/smukoko"
+        }
+    },
+    "projects": [{
+        "guid": "voxie",
+        "name": "Voxie",
+        "description": "Read a book on a Kobo (or any KOReader device), keep going as an audiobook from the same sentence in any Audiobookshelf app, and come back to the page where the audio stopped. Voxie narrates DRM-free EPUBs on your own computer, your own GPU or rented RunPod GPUs, aligns the audio to the text, and maps page and audio positions onto each other both ways, also offline on the device. One cable installs KOReader, the plugin and the account on a Kobo. Self-hosted: no books, audio or accounts are held by the project.",
+        "webpageUrl": {
+            "url": "https://github.com/smukoko/voxie-sync"
+        },
+        "repositoryUrl": {
+            "url": "https://github.com/smukoko/voxie-sync"
+        },
+        "licenses": ["spdx:AGPL-3.0-or-later", "spdx:CC-BY-4.0"],
+        "tags": ["ebooks", "audiobooks", "text-to-speech", "e-readers", "koreader", "self-hosted", "accessibility"]
+    }],
+    "funding": {
+        "channels": [{
+            "guid": "ko-fi",
+            "type": "payment-provider",
+            "address": "https://ko-fi.com/voxiesync",
+            "description": "One-time or monthly donations."
+        }],
+        "plans": [{
+            "guid": "donation",
+            "status": "active",
+            "name": "Donation",
+            "description": "Any amount. It pays for test devices, GPU time for testing narration, and the project's domain.",
+            "amount": 0,
+            "currency": "EUR",
+            "frequency": "one-time",
+            "channels": ["ko-fi"]
+        }]
+    }
+}

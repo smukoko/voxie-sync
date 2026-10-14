@@ -1,0 +1,37 @@
+# --- Gateway (librerian_gateway_v3.py) ---
+flask==3.1.3
+requests==2.34.2
+python-dotenv==1.2.4
+cryptography>=41   # the gateway image pins it (requirements-gateway.txt)
+
+# --- Engine (librerian_engine_v3.py, core/) ---
+click
+groq
+httpx
+joblib
+lxml
+mutagen
+numpy
+# Sentence boundaries for the chunker. Pure python and no data download, so it
+# does not reintroduce the import-time side effects core/ai_brain.py is warned
+# about. Covers every language narrated here (en, es, fr, nl).
+pysbd
+requests_toolbelt
+sentence-transformers
+watchdog
+xgboost
+
+# --- Narration on your CPU, the free route (server/cpu_tts.py) ---
+# Kokoro-82M, Apache-2.0. Also needs espeak-ng for words outside its lexicon
+# and for French: brew install espeak-ng
+kokoro>=0.9.4
+
+# --- Checking a voice clip (libra_cli/clip_check.py) ---
+# Whisper's word times trim a clip to speech and compare it with its transcript.
+# Optional everywhere: without it a clip is saved unchecked, with a note. On
+# Linux, `pip install faster-whisper` does the same. The model (~1.6 GB) is
+# downloaded the first time a voice is added.
+mlx-whisper; sys_platform == "darwin" and platform_machine == "arm64"
+
+# --- The watcher (mac_ghost.py) ---
+# requests, watchdog, requests_toolbelt already listed above
