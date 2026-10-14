@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+The working instructions of the AI coding agent (Claude Code) that helps
+build Voxie, public on purpose: what it must know, and the rules each
+learned from a real failure. People start at the README.
+
 Short on purpose. The measurements and stories behind every rule here are in
 the commit messages. **Search
 them before re-investigating anything on RunPod, MFA, FAT32, audio levels or

@@ -49,7 +49,7 @@ tools/run_all_tests.sh        # every offline suite and the Lua plugin; must sta
 
 ## Contributor License Agreement
 
-Before your first pull request is merged you sign the [CLA](CLA.md), once:
+Before your first pull request is merged you sign the [CLA](/.github/CLA.md), once:
 the CLA Assistant bot asks you to reply with one sentence on the pull request.
 You keep the copyright in your work.
 
