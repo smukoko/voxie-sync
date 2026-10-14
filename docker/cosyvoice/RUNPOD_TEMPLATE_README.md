@@ -32,7 +32,8 @@ bills for nothing. `POD_IDLE_MINUTES` in Voxie's `.env` changes that.
 
 ## Details
 
-- Image: `ghcr.io/smukoko/cosyvoice-tts:4.2`. It starts its own server and
+- Image: `ghcr.io/smukoko/cosyvoice-tts:4.3`, built from
+  [voxie-sync](https://github.com/smukoko/voxie-sync) by its own workflow. It starts its own server and
   carries its own settings; there is no start command and no variable to set.
 - Port **8000/tcp**: the narration API. Every request needs the
   `TTS_API_TOKEN` that Voxie generates for you and sends to each pod it
