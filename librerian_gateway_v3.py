@@ -29,7 +29,7 @@ import requests
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_file
 
-from core import abs_settings, accounts, landing, library
+from core import abs_settings, accounts, landing, library, page_audio
 from core.database import get_connection, setup_database
 from core.fingerprint import koreader_partial_md5
 
@@ -293,6 +293,33 @@ def book_map(book_id):
     return nodes, landing.audio_chapters([tuple(r) for r in chapter_rows])
 
 
+def page_start(book_id, nodes, kobo_location, node_span):
+    """Where the page starts in the audio: inside its paragraph when the KEPUB
+    and the map's word timings say so (core/page_audio.py), else the
+    paragraph's start. The page's text is read from the KEPUB and never kept."""
+    try:
+        path = landing.node_path_for_position(nodes, kobo_location)
+        with get_db() as conn:
+            row = conn.execute("SELECT epub_path FROM books WHERE book_id = ?", (book_id,)).fetchone()
+            node_ids = [r[0] for r in conn.execute(
+                """SELECT n.node_id FROM sync_nodes n JOIN chapters c ON n.chapter_id = c.chapter_id
+                   WHERE c.book_id = ? AND n.xpath_string = ? ORDER BY n.start_time""",
+                (book_id, f"point(/1{path})"))] if path else []
+            words = [conn.execute("""SELECT char_start, char_end, start_time FROM word_timings
+                                     WHERE node_id = ? ORDER BY word_index""", (n,)).fetchall()
+                     for n in node_ids]
+        if not path or not row or not row["epub_path"] or not os.path.exists(row["epub_path"]):
+            return node_span[0]
+        found = page_audio.page_start_time(os.path.abspath(row["epub_path"]), landing.kobo_path(kobo_location),
+                                           path, node_span, [[tuple(w) for w in ws] for ws in words])
+        if found is not None and found > node_span[0]:
+            print(f"   📍 The page starts {found - node_span[0]:.1f}s into its paragraph.")
+            return found
+    except Exception as e:  # a refinement: any doubt keeps the paragraph's start
+        print(f"   ⚠️ Page start inside the paragraph not found ({e}); using the paragraph's start.")
+    return node_span[0]
+
+
 def calculate_and_push_to_abs(kobo_location, kobo_percentage, abs_id, book_id, user_id=None,
                               read_at=None):
     """Translate a Kobo position to seconds and write it to ABS.
@@ -310,7 +337,7 @@ def calculate_and_push_to_abs(kobo_location, kobo_percentage, abs_id, book_id, u
         total_duration = chapters[-1][2] if chapters else 0.0
         node_span = landing.time_for_position(nodes, kobo_location)
         if node_span:
-            target = node_span[0]
+            target = page_start(book_id, nodes, kobo_location, node_span)
         else:
             print("   ⚠️ XPath missing from the map. Falling back to percentage.")
     except Exception as e:

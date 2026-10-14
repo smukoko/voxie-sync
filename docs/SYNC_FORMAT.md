@@ -127,6 +127,12 @@ What a pull answers, in order:
    seconds for context but **never back across the start of an audio chapter**
    (the exact rule is under *The device's map*, below).
 
+Where a push lands: the page's first word, two words early, when the map has
+word timings (`core/page_audio.py` measures how far into its block the
+xpointer falls, in the KEPUB, and takes the narrated word that far in); the
+same share of the block's time, 4 seconds early, when it has none; the block's
+start when either cannot be worked out. Never before the block's start.
+
 A push never moves the audio if it is already inside the pushed block, nor
 when its `read_at` is older than the audiobook's own last update (the listening
 is newer: the next pull brings the reader to it). Without `read_at`, a push

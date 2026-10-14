@@ -13,11 +13,9 @@ both ways:
 
 - **Read → listen.** Put the Kobo down mid-chapter and open the book in any
   [Audiobookshelf](https://www.audiobookshelf.org/) app: it plays from the
-  start of the paragraph at the top of your page. That is on purpose, and a
-  little early: the Kobo tells Voxie which page you are on, not how far down
-  it you read, so the audio starts where the page starts rather than risk
-  skipping what you have not read. Expect a few sentences you already know
-  (10-15 seconds on average, more after a long paragraph).
+  first words of the page you were on (two words early, to be safe). Not from
+  the line you stopped at: the Kobo tells Voxie which page you are on, not how
+  far down it you read.
 - **Listen → read.** Stop listening, pick up the Kobo: it opens on the page
   where the audio stopped, never across a chapter start.
 - **One click on a Kobo.** Plug it into a Mac and press Connect: KOReader,

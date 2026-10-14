@@ -80,6 +80,15 @@ def chapter_at(chapters, seconds):
     return len(chapters), max(0.0, seconds - chapters[-1][1])
 
 
+def node_path_for_position(nodes, position):
+    """The map's paragraph path for a KOReader position, as time_for_position finds it."""
+    known = {path for path, _, _ in nodes}
+    path = paragraph_path(position)
+    while path not in known and path.count("/") > 3:
+        path = path.rsplit("/", 1)[0]
+    return path if path in known else None
+
+
 def time_for_position(nodes, position):
     """(start, end) of the paragraph a KOReader position is in, or None.
 

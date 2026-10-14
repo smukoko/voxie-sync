@@ -236,6 +236,39 @@ with gw.get_db() as db:
 check("an ABS that does not answer is not a gone item: the id is kept, nothing is searched",
       cached == "abs2" and not found.called, f"({cached})")
 
+# --- Read -> listen from the page's first sentence (core/page_audio.py, 2026-10-14) -----
+# p[21] (130-200 s) holds two sentences; a page that opens on the second must
+# start the audio two words before it, not at the paragraph's start.
+with gw.get_db() as db:
+    epub = db.execute("SELECT epub_path FROM books WHERE book_id=?", (book_id,)).fetchone()[0]
+    p21 = db.execute("SELECT node_id FROM sync_nodes WHERE xpath_string=?", (P(21),)).fetchone()[0]
+    text = "One two three four. Five six seven eight."
+    at = 0
+    for n, w in enumerate(text.split()):
+        at = text.index(w, at)
+        db.execute("INSERT INTO word_timings (node_id, word_index, word, char_start, char_end, start_time, end_time)"
+                   " VALUES (?, ?, NULL, ?, ?, ?, ?)", (p21, n, at, at + len(w), 130.0 + 5 * n, 134.0 + 5 * n))
+        at += len(w)
+    db.commit()
+paras = "".join(f"<p>p{i}</p>" for i in range(1, 21))
+os.makedirs(os.path.dirname(epub), exist_ok=True)
+with zipfile.ZipFile(epub, "w") as z:
+    z.writestr("META-INF/container.xml", '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+               '<rootfiles><rootfile full-path="content.opf"/></rootfiles></container>')
+    z.writestr("content.opf", '<package xmlns="http://www.idpf.org/2007/opf"><manifest>'
+               '<item id="a" href="a.xhtml"/><item id="b" href="b.xhtml"/><item id="c" href="c.xhtml"/></manifest>'
+               '<spine><itemref idref="a"/><itemref idref="b"/><itemref idref="c"/></spine></package>')
+    for name in ("a.xhtml", "b.xhtml"):
+        z.writestr(name, "<html><body><p>x</p></body></html>")
+    z.writestr("c.xhtml", f"<html><body>{paras}<p><span>One two three four. </span><span>Five six seven eight.</span></p></body></html>")
+sent = push("/body/DocFragment[3]/body/p[21]/span[2]/text().0", abs_now=60.0)
+check("a page opening on a paragraph's second sentence starts the audio there, two words early",
+      sent == 140.0, f"(pushed {sent}; 'Five' is at 150 s, the paragraph at 130 s)")
+sent = push("/body/DocFragment[3]/body/p[21]/span[1]/text().0", abs_now=60.0)
+check("a page opening on a paragraph's first word keeps the paragraph's start", sent == 130.0, f"(pushed {sent})")
+sent = push("/body/DocFragment[3]/body/p[21]/span[2]/text().0", abs_now=135.0)
+check("audio already inside that paragraph is still left alone", sent is None, f"(pushed {sent})")
+
 print("=" * 60)
 print(f"{passed + failed} checks: {passed} passed, {failed} FAILED")
 sys.exit(1 if failed else 0)
