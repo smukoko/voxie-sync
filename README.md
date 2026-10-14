@@ -12,9 +12,16 @@ Free and open source. Your books, your server, no account with us.
 The end of *The Yellow Wallpaper* (Charlotte Perkins Gilman, public domain),
 under a minute, narrated by Voxie two ways:
 
-| Free, on your own computer | The recommended setup |
-| --- | --- |
-| [Listen](assets/samples/the-yellow-wallpaper-kokoro.mp3): Kokoro, its `af_heart` voice | [Listen](assets/samples/the-yellow-wallpaper-recommended.mp3): CosyVoice on RunPod in a voice you choose (here, the maintainer's own), directed line by line |
+**Free, on your own computer:** Kokoro, its `af_heart` voice
+([MP3](assets/samples/the-yellow-wallpaper-kokoro.mp3))
+
+https://github.com/user-attachments/assets/8120b150-32e9-479d-8c89-c452ebf83343
+
+**The recommended setup:** CosyVoice on RunPod in a voice you choose (here,
+the maintainer's own), directed line by line
+([MP3](assets/samples/the-yellow-wallpaper-recommended.mp3))
+
+https://github.com/user-attachments/assets/4f6a542a-60f4-4ad0-9ac2-ef0b3a58bdae
 
 ## Install
 
