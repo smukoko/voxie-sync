@@ -25,15 +25,32 @@ die() { printf '\n\033[1;31m%s\033[0m\n' "$*" >&2; exit 1; }
 case "$(uname -s)" in
 Darwin)
     command -v brew >/dev/null || die "Install Homebrew first (https://brew.sh), then run this line again."
-    say "Installing Python, ffmpeg, espeak-ng, kepubify and git (Homebrew) ..."
-    brew install python@3.12 ffmpeg espeak-ng kepubify git
+    # Every brew call reads /dev/null: brew's children read the pipe this
+    # script arrives on and ate its next lines (2026-10-16: the install stopped
+    # after brew and never cloned Voxie). Written out on each call, not as a
+    # wrapper function: macOS's bash 3.2 exits on a failing function inside `||`
+    # under `set -e`.
+    # Only what is missing. `brew install` on an installed but outdated tool
+    # upgrades it and everything that depends on it (ffmpeg, mpv, openssl ...
+    # on the first from-scratch test): not the business of a Voxie install.
+    missing=""
+    for formula in python@3.12 ffmpeg espeak-ng kepubify git; do
+        brew list --formula "$formula" </dev/null >/dev/null 2>&1 || missing="$missing $formula"
+    done
+    if [ -n "$missing" ]; then
+        say "Installing${missing} (Homebrew) ..."
+        # shellcheck disable=SC2086  # formula names, no spaces
+        brew install $missing </dev/null
+    else
+        say "Python, ffmpeg, espeak-ng, kepubify and git are already installed."
+    fi
     if ! command -v docker >/dev/null; then
         say "Installing Docker Desktop (Voxie uses it to align the narration with the text) ..."
-        brew install --cask docker
+        brew install --cask docker </dev/null
         DOCKER_NOTE="Open Docker Desktop once (Applications) and let it finish starting."
     fi
-    PYTHON="$(brew --prefix python@3.12)/bin/python3.12"
-    BIN_DIR="$(brew --prefix)/bin"
+    PYTHON="$(brew --prefix python@3.12 </dev/null)/bin/python3.12"
+    BIN_DIR="$(brew --prefix </dev/null)/bin"
     ;;
 Linux)
     command -v apt-get >/dev/null || die "This installer knows Debian and Ubuntu. Elsewhere, install Python 3.10-3.12, ffmpeg, espeak-ng, kepubify and Docker, then follow docs/GUIDE.md."
