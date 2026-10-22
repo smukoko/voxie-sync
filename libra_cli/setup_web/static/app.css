@@ -323,6 +323,39 @@ details.log pre {
 .next > div { padding-top: 1rem; border-top: 2px solid var(--amber); }
 .next p { color: var(--ink-dim); }
 
+/* ----------------------------------------------------------- prepare -- */
+.prepare { list-style: none; margin: 1.25rem 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 2rem; }
+.prepare h2 { display: flex; flex-direction: column; }
+.prepare .optional { margin-left: 0; }
+.prepare li { padding-top: 0.9rem; border-top: 2px solid var(--amber); }
+.prepare p { color: var(--ink-dim); margin: 0.2rem 0 0.7rem; }
+.button-link {
+  display: inline-block; font-weight: 500; text-decoration: none;
+  border: 1px solid var(--track); border-radius: var(--radius-small);
+  padding: 0.45rem 1rem; background: var(--panel); color: var(--ink);
+}
+.button-link:hover { border-color: var(--ink); }
+
+/* The last page is a single screen: the reader should see the support link
+   without scrolling (user, 2026-10-22). On a window too short for that, it
+   scrolls like any page. */
+.support {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: var(--amber-soft); border-radius: var(--radius-small);
+  padding: 0.75rem 1rem; margin: 1.25rem 0 0;
+}
+.support p { margin: 0; }
+.support .button-link { white-space: nowrap; }
+.on-done .frame { padding-top: 1.5rem; padding-bottom: 1rem; }
+.on-done .hero { grid-template-columns: minmax(0, 1fr) 6.5rem; gap: 2rem; }
+.on-done .lead { margin-bottom: 0.5rem; }
+.on-done .next { margin-top: 0; gap: 2rem; }
+.on-done .next h2 { margin-top: 0; }
+.on-done .next p { margin: 0 0 0.6rem; }
+.on-done .actions { margin-top: 1rem; }
+.on-done .fine { margin: 0.75rem 0 0; }
+@media (min-height: 44rem) and (min-width: 52rem) { html:has(.on-done), .on-done { overflow: hidden; height: 100vh; } }
+
 /* ------------------------------------------------------------ narrow -- */
 @media (max-width: 52rem) {
   .frame, .frame.no-rail { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding-top: 1.5rem; }
@@ -333,7 +366,7 @@ details.log pre {
   h1 { font-size: 1.75rem; }
   .kobo-stage { grid-template-columns: 7rem 1fr; gap: 1.25rem; }
   .hero { grid-template-columns: minmax(0, 1fr) 5.5rem; gap: 1.25rem; }
-  .next, .pair { grid-template-columns: 1fr; }
+  .next, .pair, .prepare { grid-template-columns: 1fr; }
   .notice { flex-direction: column; align-items: flex-start; }
 }
 

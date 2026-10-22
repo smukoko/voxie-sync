@@ -532,11 +532,11 @@ class GhostHandler(FileSystemEventHandler):
             # already printed how to add one.
             print("🎙️  No narrator voice, so no audiobook this time.")
             notify("Voxie needs a narrator voice",
-                   f"'{book_name}' is readable now. Add a voice (localhost:3005/voices "
-                   "or `voxie voice-add`), then drop the book again for its audiobook.")
+                   f"'{book_name}' is readable now. Add a voice (run `voxie init`, or "
+                   "`voxie voice-add`), then drop the book again for its audiobook.")
             if early_lib_id:
                 report_failed(early_lib_id)
-            set_aside(filepath, "It needs a narrator voice first.")
+            set_aside(filepath, "It needs a narrator voice first: run `voxie init` and add one.")
             return
         if engine_proc.returncode == NOT_ENGLISH_EXIT:
             # Not a failure: Voxie narrates English only (core/languages.py).

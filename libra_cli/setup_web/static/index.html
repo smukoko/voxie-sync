@@ -58,18 +58,51 @@
       <div class="hero">
         <div>
       <h1 tabindex="-1">Set up Voxie</h1>
-      <p class="lead">Read a book on your Kobo, keep going as an audiobook on your phone, and come back to the page where the audio stopped. Setting it up takes about ten minutes.</p>
+      <p class="lead">Read a book on your Kobo, keep going as an audiobook on your phone, and come back to the page where the audio stopped. Setup itself takes about ten minutes. Making the accounts it uses takes longer, so the next page lets you do that first.</p>
       <h2 class="minor">Have these ready</h2>
       <ul class="needs">
         <li><strong>Your Kobo</strong> and its USB cable.</li>
-        <li><strong>A server.</strong> We will help you rent a small one at Hetzner, about €5 a month, or you can use one you already run.</li>
-        <li><strong>A RunPod account</strong>, if you want the best voices. You can also narrate for free on this Mac.</li>
+        <li><strong>Three small accounts</strong> (a server, a narration GPU and a voice director). The next page walks you through them, and each one is optional.</li>
+        <li><strong>A short clip of the narrator's voice</strong>, if you want the best voices. You can also narrate for free on this Mac.</li>
       </ul>
         </div>
         <div class="kobo-stage hero-art" data-state="idle"><div class="kobo-slot"></div></div>
       </div>
       <div class="actions">
-        <button class="primary" data-go="account">Start</button>
+        <button class="primary" id="start">Start</button>
+      </div>
+    </section>
+
+    <!-- Before setup proper: the accounts take longest, and nothing here is saved. -->
+    <section class="step" data-step="prepare" hidden>
+      <h1 tabindex="-1">Make your accounts first</h1>
+      <p class="lead">These take about 20 minutes in all, and every later step goes faster when they already exist. Setup has not started: skip any of them now and Voxie asks for it when it is needed.</p>
+      <ol class="prepare">
+        <li>
+          <h2>Hetzner <span class="optional">the server, about €5 a month</span></h2>
+          <p>Make an account and add a payment method. Hetzner sometimes checks a new account before it lets you rent a server, which can take a while: start with this one. Already run a Voxie server? Skip it.</p>
+          <a id="prepare-hetzner" class="secondary button-link" href="#" target="_blank" rel="noopener">Open Hetzner Cloud</a>
+        </li>
+        <li>
+          <h2>RunPod <span class="optional">the narration GPU, under $1 a novel</span></h2>
+          <p>Make an account, add a few dollars of credit, then <em>Settings, API Keys, Create API Key</em> and keep the key somewhere you can copy it. Skip it to narrate for free on this Mac, slower and with preset voices.</p>
+          <a id="prepare-runpod" class="secondary button-link" href="#" target="_blank" rel="noopener">Open RunPod</a>
+        </li>
+        <li>
+          <h2>OpenRouter <span class="optional">the voice director, about $0.10 a novel</span></h2>
+          <p>Make an account, add a few dollars of credit, then <em>Keys, Create Key</em> and keep the key too. Without it the narrator reads without direction.</p>
+          <a id="prepare-openrouter" class="secondary button-link" href="#" target="_blank" rel="noopener">Open OpenRouter</a>
+        </li>
+        <li>
+          <h2>A voice clip <span class="optional">8 to 15 seconds</span></h2>
+          <p>Your own recording, or a YouTube link to someone who agreed to be cloned, with the start and end times and the exact words said.</p>
+        </li>
+      </ol>
+      <p class="fine" id="prepare-disclosure"></p>
+      <div class="actions">
+        <button type="button" class="ghost" data-go="welcome">Back</button>
+        <button type="button" class="ghost" data-go="account">Skip, I'll do it later</button>
+        <button type="button" class="primary" data-go="account">I'm ready, continue</button>
       </div>
     </section>
 
@@ -296,6 +329,7 @@
         <div id="voice-form-wrap">
           <p>No voice comes with Voxie. Use 8 to 15 seconds of someone speaking clearly: your own voice, or someone who agreed to it.</p>
           <p class="hint">The clip's mood becomes the narrator's: calm, clear, one voice only, no laughs, sighs or music.</p>
+          <p class="hint"><strong>Two steps:</strong> check the clip, then listen and press <em>Keep this voice</em>. Nothing is saved before that.</p>
           <form id="voice-form" novalidate>
             <div class="segmented" role="radiogroup" aria-label="Where the clip comes from">
               <label><input type="radio" name="voice-source" value="url" checked><span>A YouTube link</span></label>
@@ -331,7 +365,7 @@
             </div>
             <p class="error" id="voice-error" role="alert"></p>
             <div class="actions left">
-              <button class="secondary" type="submit" id="voice-add">Check this clip</button>
+              <button class="primary" type="submit" id="voice-add">Check this clip</button>
             </div>
           </form>
           <div class="voice-preview" id="voice-preview" hidden>
@@ -341,7 +375,7 @@
             <ul class="voice-warnings" id="voice-warnings"></ul>
             <p class="error" id="voice-keep-error" role="alert"></p>
             <div class="actions left">
-              <button type="button" id="voice-keep">Keep this voice</button>
+              <button type="button" class="primary" id="voice-keep">Keep this voice</button>
               <button type="button" class="secondary" id="voice-again">Try another clip</button>
             </div>
           </div>
@@ -418,7 +452,7 @@
         <div>
           <h2>Add your first book</h2>
           <p>Drop an EPUB into the Kobo_Dropzone folder. It reaches your Kobo in a few minutes, through the Voxie button, and the audiobook follows when it is narrated.</p>
-          <p class="hint">Every book you drop is then kept in <strong>Kobo_Archive</strong>. Keep it: to give an ebook-only book its audiobook later, or narrate one again, drop the same file back in from there.</p>
+          <p class="hint">Dropped books are kept in <strong>Kobo_Archive</strong>: drop one back in to narrate it again.</p>
           <button type="button" class="secondary" id="open-dropzone">Open Kobo_Dropzone</button>
         </div>
         <div>
@@ -427,16 +461,19 @@
           <dl class="settings">
             <dt>Server</dt><dd><div class="copy-box tight"><code id="done-abs"></code><button type="button" class="ghost small" data-copy="done-abs">Copy</button></div></dd>
             <dt>Username</dt><dd><code id="done-user"></code></dd>
-            <dt>Password</dt><dd>the one you chose</dd>
+            <dt>Password</dt><dd>the one you chose<br><span class="fine">Forgotten? On the Kobo: Discover, long-press Voxie, Edit, Show password.</span></dd>
           </dl>
         </div>
+      </div>
+      <div class="support">
+        <p>Voxie is free and lives on donations. If it is useful to you, a coffee keeps it going.</p>
+        <a id="donate-link" class="button-link" href="#" target="_blank" rel="noopener">Support it on Ko-fi</a>
       </div>
       <div class="actions">
         <button type="button" class="primary" id="finish">Close setup</button>
       </div>
       <p class="status" id="finish-status" role="status"></p>
-      <p class="fine">When a new version of Voxie changes the Kobo's part, plug the Kobo in and open setup again (<code>voxie init</code>): everything you entered is remembered.</p>
-      <p class="fine">Voxie is free and lives on donations. If it is useful to you, <a id="donate-link" href="#" target="_blank" rel="noopener">support it on Ko-fi</a>.</p>
+      <p class="fine">After a Voxie update that changes the Kobo's part, plug the Kobo in and run <code>voxie init</code> again: everything you entered is remembered.</p>
     </section>
   </main>
 </div>

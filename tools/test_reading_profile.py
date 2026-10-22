@@ -89,7 +89,7 @@ check("a settings file with no plugins_disabled gets one", '["plugins_disabled"]
 root5 = device(settings=None)
 RP.apply_profile(root5, fonts_installed=True, log=silent)
 from libra_cli import luatable as _lt
-_owned = {"plugins_disabled", "cre_font", "start_with", RP.MARKER, RP.VERSION_KEY, *RP.TYPOGRAPHY}
+_owned = {"plugins_disabled", "cre_font", "start_with", "quickstart_shown_version", RP.MARKER, RP.VERSION_KEY, *RP.TYPOGRAPHY}
 check("a brand-new device gets only the profile's own keys, not a guessed file",
       set(_lt.loads(read(root5))) <= _owned, str(set(_lt.loads(read(root5))) - _owned))
 
@@ -130,6 +130,25 @@ check("a v1 device gets v2 without plugins being disabled again", res["disabled"
 check("a line spacing the reader chose is kept", t["copt_line_spacing"] == 130)
 check("KOReader's default font becomes Literata", t["cre_font"] == "Literata")
 check("v2 applies once", RP.apply_profile(v1, fonts_installed=True, log=silent)["applied"] is False)
+
+# ---- v3: the quick-start manual ---------------------------------------------
+check("v3: a first launch does not open KOReader's manual",
+      _lt.loads(read(root)).get("quickstart_shown_version") == RP.QUICKSTART_SEEN)
+check("v3: a v1 device is marked too", t.get("quickstart_shown_version") == RP.QUICKSTART_SEEN)
+v2 = device(settings='''return {
+    ["librasync_profile_version"] = 2,
+    ["start_with"] = "history",
+}''')
+res = RP.apply_profile(v2, fonts_installed=True, log=silent)
+check("v3: a v2 device gets only the mark", res["applied"] and _lt.loads(read(v2)).get("quickstart_shown_version") == RP.QUICKSTART_SEEN
+      and _lt.loads(read(v2)).get("copt_font_size") is None)
+seen = device(settings='''return {
+    ["librasync_profile_version"] = 2,
+    ["quickstart_shown_version"] = 202701010000,
+}''')
+RP.apply_profile(seen, fonts_installed=True, log=silent)
+check("v3: a guide KOReader recorded as seen keeps its own number",
+      _lt.loads(read(seen))["quickstart_shown_version"] == 202701010000)
 
 kobo = tempfile.mkdtemp()
 def sidecar(where, body):

@@ -31,7 +31,7 @@ for name, lang in (("anna", "en"), ("marc", "fr"), ("eve", "en")):
 with mock.patch.dict(os.environ, {"COSY_VOICE": ""}):
     msg = voices.missing_voice(directory=empty)
     check("no voices: the advice names both ways to add one",
-          msg and "voice-add" in msg and "localhost:3005/voices" in msg, f"({msg!r})")
+          msg and "voice-add" in msg and "voxie init" in msg, f"({msg!r})")
     check("and asks for the speaker's agreement", msg and "agreed" in msg)
     check("an unknown --voice is named",
           "'zed'" in (voices.missing_voice("zed", directory=full) or ""))
@@ -77,6 +77,16 @@ ghost_code = int(re.search(r"^NO_VOICE_EXIT = (\d+)", ghost, re.M).group(1))
 check("the watcher knows the same exit code", ghost_code == engine.NO_VOICE_EXIT)
 check("and notifies instead of reporting a crash",
       "returncode == NO_VOICE_EXIT" in ghost and 'notify("Voxie needs a narrator voice"' in ghost)
+
+# The setup page saves a voice from the reader's shell; the watcher looks for it
+# from the checkout. Both must mean the same folder (2026-10-22).
+import subprocess
+probe = "from core import voices; print(voices.VOICES_DIR)"
+dirs = {subprocess.run([sys.executable, "-c", probe], cwd=cwd, capture_output=True, text=True,
+                       env={**{k: v for k, v in os.environ.items() if k != "COSY_VOICES_DIR"}, "PYTHONPATH": ROOT}).stdout.strip()
+        for cwd in (ROOT, tempfile.gettempdir())}
+check("the voices folder is the same from any directory, inside the checkout",
+      dirs == {os.path.join(ROOT, "voices")}, str(dirs))
 
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

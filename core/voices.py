@@ -23,7 +23,13 @@ languages will need later, and choose() warns when a voice is not English.
 import json
 import os
 
-VOICES_DIR = os.getenv("COSY_VOICES_DIR", "voices")
+# Anchored to the checkout, never to the current directory: `voxie init` is run
+# from wherever the reader's shell happens to be (their home, on a from-scratch
+# install) while the watcher runs from the checkout, so a relative "voices"
+# saved the voice in one place and looked for it in another (2026-10-22: the
+# first book was set aside for "no narrator voice" with one just added).
+VOICES_DIR = os.getenv("COSY_VOICES_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "voices")
 
 # What Voxie narrates. CosyVoice 3 itself reads nine languages; only English has
 # been tested end to end, so only English is offered.
@@ -124,7 +130,7 @@ def choose(name=None, book_language=None, directory=None):
 
 
 HOW_TO_ADD = ("Add one from an 8-15 second clip of someone who agreed to it: the Voxie "
-              "setup page (http://localhost:3005/voices), or\n"
+              "setup page (run `voxie init`, then Narration > Your narrator's voice), or\n"
               "  voxie voice-add --file memo.m4a --start 0:05 --end 0:17 "
               "--text \"exactly what is said\" --name me --consent self")
 

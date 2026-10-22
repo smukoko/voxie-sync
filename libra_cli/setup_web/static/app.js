@@ -4,7 +4,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const STEPS = ["welcome", "account", "server", "narration", "kobo", "done"];
+const STEPS = ["welcome", "prepare", "account", "server", "narration", "kobo", "done"];
 const RAIL = ["account", "server", "narration", "kobo"];
 
 let key = new URLSearchParams(location.hash.slice(1)).get("k");
@@ -108,6 +108,7 @@ function go(step) {
     li.classList.toggle("done", done.has(s) && s !== step);
     if (s === step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
   });
+  document.body.classList.toggle("on-done", step === "done");
   try { sessionStorage.setItem("voxie-step", step); } catch (_) {}
   window.scrollTo(0, 0);
   document.querySelector(`[data-step="${step}"] h1`).focus();
@@ -418,12 +419,12 @@ function closePreview() {
   $("voice-audio").pause();
 }
 async function keepVoice() {
-  if (!stagedVoice) return;
+  if (!stagedVoice) return false;
   const button = $("voice-keep");
   busy(button, true, "Keeping…");
   try {
     const r = await api("/api/voice/keep", { body: { staged: stagedVoice.staged } });
-    if (!r.ok) { $("voice-keep-error").textContent = r.error; busy(button, false); return; }
+    if (!r.ok) { $("voice-keep-error").textContent = r.error; busy(button, false); return false; }
     const seconds = stagedVoice.seconds;
     closePreview();
     state.voices = [...(state.voices || []), r.name];
@@ -433,8 +434,18 @@ async function keepVoice() {
     $("voice-form").reset();
   } catch (x) {
     $("voice-keep-error").textContent = x.message;
+    busy(button, false);
+    return false;
   }
   busy(button, false);
+  return true;
+}
+// A clip that was checked but not kept, or typed but not checked, is not a
+// voice yet. On 2026-10-22 a from-scratch install left the page that way and
+// the first book was set aside for want of a narrator. "Save and continue"
+// finishes what the reader started instead of walking past it.
+function voiceFormStarted() {
+  return !$("voice-form").hidden && ($("voice-url").value.trim() || $("voice-file").files[0] || $("voice-text").value.trim());
 }
 async function tryAgain() {
   if (stagedVoice) api("/api/voice/discard", { body: { staged: stagedVoice.staged } }).catch(() => {});
@@ -473,8 +484,19 @@ async function saveNarration(e) {
         return;
       }
     }
+    if (stagedVoice) {
+      busy(button, true, "Keeping your voice…");
+      const kept = await keepVoice();
+      busy(button, false);
+      if (!kept) { $("voice-block").scrollIntoView({ block: "center" }); return; }
+    } else if (voiceFormStarted()) {
+      err.textContent = "Your voice is not saved yet. Press “Check this clip”, listen to it, then “Keep this voice”.";
+      $("voice-add").focus();
+      $("voice-block").scrollIntoView({ block: "center" });
+      return;
+    }
     if (!state.voices || !state.voices.length) {
-      if (!confirm("No voice yet: RunPod cannot narrate until you add one. Continue anyway?")) return;
+      if (!confirm("You have not added a narrator voice. Your books will reach the Kobo as ebooks, but none will be narrated until you add one (run voxie init again). Continue anyway?")) return;
     }
   }
   busy(button, true, "Saving…");
@@ -571,6 +593,18 @@ async function installKobo(e) {
   }
 }
 
+// ------------------------------------------------------------- prepare --
+// The accounts page comes before the first step so it does not feel like
+// setup has begun. Someone who already has a server and a RunPod key (a re-run
+// of `voxie init`) goes straight past it.
+function initPrepare() {
+  $("prepare-hetzner").href = state.links.hetzner;
+  $("prepare-runpod").href = state.links.runpod;
+  $("prepare-openrouter").href = state.links.openrouter;
+  $("prepare-disclosure").textContent = state.links.disclosure;
+  $("start").addEventListener("click", () => go(state.currentAbsUrl && state.hasRunpodKey ? "account" : "prepare"));
+}
+
 // ---------------------------------------------------------------- done --
 function initDone() {
   $("open-dropzone").addEventListener("click", () => api("/api/open-dropzone", { body: {} }));
@@ -599,6 +633,7 @@ function fillDone() {
   });
   if (!key) { $("session-lost").hidden = false; return; }
   try { state = await api("/api/state"); } catch (_) { return; }
+  initPrepare();
   initAccount();
   initServer();
   initNarration();

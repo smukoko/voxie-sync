@@ -15,6 +15,11 @@ v2: a calmer page, verified on screen in KOReader 2026.07.1 at a Clara 2E's
     Wireless Calibre and cloud storage are no longer disabled: they are how
     books reach the device when the gateway does not serve them.
 
+v3: KOReader's quick-start guide is marked as seen. A first launch from the
+    Voxie button used to open its manual instead of the reader's covers
+    (user, 2026-10-22, a from-scratch install). Only a device that never
+    recorded the guide gets the mark; one that has seen it keeps its own.
+
 What it does NOT touch: the sleep screen, the status bar, page refresh,
 statistics. Those are taste.
 
@@ -36,7 +41,10 @@ PLUGINS_DIR = ".adds/koreader/plugins"
 BACKUP_SUFFIX = ".before-librasync"
 MARKER = "librasync_profile_applied"          # v1, kept for devices that have it
 VERSION_KEY = "librasync_profile_version"
-PROFILE_VERSION = 2
+PROFILE_VERSION = 3
+# KOReader opens its quick-start manual while quickstart_shown_version is below
+# its own; tools/kosim/setup.sh uses the same value for the pinned 2026.07.1.
+QUICKSTART_SEEN = 202607010000
 
 # Keys are plugin folder names without ".koplugin" -- that is what
 # pluginloader.lua indexes plugins_disabled by, and it is case-sensitive.
@@ -125,6 +133,9 @@ def apply_profile(kobo_path, fonts_installed, log=print, keep_plugins=False):
                 settings[key] = ours
                 styled.append(key)
         settings.setdefault("start_with", "history")
+
+    if version < 3:
+        settings.setdefault("quickstart_shown_version", QUICKSTART_SEEN)
 
     settings[MARKER] = True
     settings[VERSION_KEY] = PROFILE_VERSION
