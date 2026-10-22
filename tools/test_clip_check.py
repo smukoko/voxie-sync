@@ -156,6 +156,57 @@ except voice.VoiceError as e:
     refused = "of the clip is speech" in str(e)
 check("a clip with under 3s of speech once trimmed is refused", refused)
 
+# --- how the clip is paced -------------------------------------------------
+# The first install's own clip (2026-10-22), word times as Whisper gave them:
+# two sentences with 0.34 s between "AI." and "So". The narrator started every
+# sentence that quickly after a full stop.
+FIRST_CLIP = "Hey there, today I'm recording my voice because I want my voice to be cloned by AI.\r\nSo I have to speak very clearly."
+times = [(" Hey", 0.00, 0.44), (" there,", 0.44, 0.74), (" today", 1.02, 1.26), (" I'm", 1.26, 1.74),
+         (" recording", 1.74, 2.02), (" my", 2.02, 2.22), (" voice", 2.22, 2.62), (" because", 2.62, 3.46),
+         (" I", 3.46, 3.90), (" want", 3.90, 4.12), (" my", 4.12, 4.32), (" voice", 4.32, 4.64),
+         (" to", 4.64, 4.80), (" be", 4.80, 4.90), (" cloned", 4.90, 5.22), (" by", 5.22, 5.42),
+         (" AI,", 5.42, 5.86), (" so", 6.20, 6.72), (" I", 6.72, 6.90), (" have", 6.90, 7.08),
+         (" to", 7.08, 7.20), (" speak", 7.20, 7.48), (" very", 7.48, 7.84), (" clearly.", 7.84, 8.14)]
+gaps = cc.sentence_gaps(FIRST_CLIP, times, "en")
+check("the gap after the first sentence is found where the typed text ends it",
+      gaps == [("ai", 0.34)], str(gaps))
+report = cc.pace_report(FIRST_CLIP, times, "en")
+check("a clip that starts the next sentence 0.34 s after a full stop is advised a retake",
+      report["retake"] and any("0.3 s after a full stop" in w and "one second" in w.replace("a second", "one second")
+                               for w in report["warnings"]), str(report["warnings"]))
+check("its speed (about 170 words a minute) is not the problem", report["wpm"] < cc.FAST_WPM, f"({report['wpm']} wpm)")
+
+
+def stretched(gap):
+    """The same words with `gap` seconds of silence after the first sentence."""
+    out = []
+    for w, a, b in times:
+        out.append((w, a + (gap - 0.34 if a >= 6.0 else 0), b + (gap - 0.34 if a >= 6.0 else 0)))
+    return out
+
+
+good = cc.pace_report(FIRST_CLIP, stretched(1.0), "en")
+check("a full second after the full stop is not warned about", not good["retake"] and not good["warnings"],
+      str(good))
+fast = cc.pace_report("One two three four five six seven eight nine ten eleven twelve thirteen.",
+                      [(f" w{i}", i * 0.25, i * 0.25 + 0.2) for i in range(13)], "en")
+check("a clip read at 230 words a minute is advised a retake", fast["retake"] and "words a minute" in fast["warnings"][0],
+      str(fast))
+slow = cc.pace_report("One two three four five six seven eight nine ten eleven twelve thirteen.",
+                      [(f" w{i}", i * 0.9, i * 0.9 + 0.5) for i in range(13)], "en")
+check("a very slow clip is warned about, not sent back", slow["warnings"] and not slow["retake"], str(slow))
+one = cc.pace_report("Hey there today I am recording my voice for the narrator.",
+                     [(f" w{i}", i * 0.4, i * 0.4 + 0.3) for i in range(11)], "en")
+check("a single sentence has no sentence gap to judge", one["sentence_gaps"] == [] and not one["warnings"], str(one))
+check("a heard word out of order is skipped, not guessed",
+      cc.sentence_gaps("Hello there. Goodbye now.", [(" Nothing", 0, 1), (" else", 1.1, 2)], "en") == [])
+# Through check(): the report carries it and add_voice's warnings show it.
+quick = [(w.strip(), a, b, 180) for w, a, b in times]
+path = clip(quick, seconds=9.0, name="quick.wav")
+rep = cc.check(path, FIRST_CLIP, "en", lufs=-20, listen=lambda p, lang: times)
+check("check() reports the retake and the advice", rep["retake"] and any("full stop" in w for w in rep["warnings"]),
+      str(rep["warnings"]))
+
 shutil.rmtree(work, ignore_errors=True)
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

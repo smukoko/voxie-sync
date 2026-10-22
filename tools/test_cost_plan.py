@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import cost_plan  # noqa: E402
+os.environ["VOXIE_SPEED_ALLOWANCE"] = "0"     # the share rule below; the allowance is tested at the end
 
 passed = failed = 0
 
@@ -116,6 +117,33 @@ check("at $0.89 the default budget rents the A5000, not the 4090",
 check("a budget of $1.50 per 16 hours rents the 4090 too: the same book in under half the time",
       "NVIDIA GeForce RTX 4090" in [g for g, *_ in cost_plan.candidates(quote, budget=1.5)],
       str(cost_plan.candidates(quote, budget=1.5)))
+cost_plan.set_other_spend(0.0, 0.0)
+
+# --- The speed allowance (2026-10-22) -----------------------------------------
+# A boot costs the same for a short book as for a long one; the allowance pays
+# for boots, and fades to nothing at 16 hours so the promise is untouched.
+os.environ.pop("VOXIE_SPEED_ALLOWANCE", None)
+check("the allowance is $0.20 by default", cost_plan.speed_allowance() == 0.20)
+check("it fades to nothing at 16 hours", cost_plan.allowance_for(16.0) == 0.0 and cost_plan.allowance_for(20.0) == 0.0)
+check("and is whole for a book of no length", abs(cost_plan.allowance_for(0.0) - 0.20) < 1e-9)
+os.environ["VOXIE_SPEED_ALLOWANCE"] = "nonsense"
+check("a value that is not a number falls back to the default", cost_plan.speed_allowance() == 0.20)
+os.environ.pop("VOXIE_SPEED_ALLOWANCE", None)
+cost_plan.set_other_spend(0.065, 7.8)       # Winning: the director's and the filters' spend
+a5000 = cost_plan.SPEED["NVIDIA RTX A5000"]
+with_allowance = cost_plan.pods_for(7.8, 0.27, a5000, wanted=4, budget=1.0)
+os.environ["VOXIE_SPEED_ALLOWANCE"] = "0"
+without = cost_plan.pods_for(7.8, 0.27, a5000, wanted=4, budget=1.0)
+os.environ.pop("VOXIE_SPEED_ALLOWANCE", None)
+check("Winning (7.8 h, A5000): four pods with the allowance, fewer without",
+      with_allowance == 4 and without < 4, f"({with_allowance} vs {without})")
+check("its whole bill is its share plus the allowance, and no more",
+      cost_plan.book_cost(0.27, a5000, 7.8, 4) + 0.065
+      <= 1.0 * 7.8 / 16 + cost_plan.allowance_for(7.8) + 1e-9)
+cost_plan.set_other_spend(0.133, 16.0)
+n16 = cost_plan.pods_for(16.0, 0.27, a5000, wanted=12, budget=1.0)
+check("a 16-hour book is held to the promise exactly as before: the whole bill within the margin",
+      cost_plan.book_cost(0.27, a5000, 16.0, n16) + 0.133 <= cost_plan.PLANNING_MARGIN * 1.0 + 1e-9, f"({n16} pods)")
 cost_plan.set_other_spend(0.0, 0.0)
 
 print(f"\n{passed} passed, {failed} failed")

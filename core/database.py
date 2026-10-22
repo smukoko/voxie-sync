@@ -287,3 +287,4 @@ def apply_global_time_offsets(db_path, book_id):
     conn.commit()
     conn.close()
     print(f"   ✅ Global Timeline locked. Total Book Duration: {running_total_offset:.2f}s")
+    return running_total_offset

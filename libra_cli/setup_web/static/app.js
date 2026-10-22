@@ -332,6 +332,7 @@ function initNarration() {
   document.querySelectorAll('input[name="narration"]').forEach((r) => r.addEventListener("change", sync));
   sync();
   showVoices(state.voices);
+  initVoiceScript();
 
   document.querySelectorAll('input[name="voice-source"]').forEach((r) => r.addEventListener("change", () => {
     const file = document.querySelector('input[name="voice-source"]:checked').value === "file";
@@ -349,29 +350,138 @@ function showVoices(voices) {
   $("voice-list").hidden = !has;
   $("voice-names").textContent = has ? voices.join(", ") : "";
   $("voice-form-wrap").hidden = !!has;
-  $("voice-form-wrap").querySelector("p").textContent = has
+  $("voice-intro").textContent = has
     ? "Add another voice if you like."
-    : "No voice comes with Voxie. Use 8 to 15 seconds of someone speaking clearly: your own voice, or someone who agreed to it.";
+    : "No voice comes with Voxie. Record your own, or use someone who agreed to it.";
+}
+
+// ------------------------------------------------------- the voice script --
+// The narrator copies how its clip is read: a clip with 0.3 s between two
+// sentences gave a narrator that hurries after every full stop (2026-10-22).
+// So the default is a text to read, with the pauses spelled out, recorded here
+// or as a voice memo; the server checks the reading and says when to read again.
+let voiceMode = "script";
+let recording = null;          // { blob, name } once something was recorded
+let recorder = null;
+function initVoiceScript() {
+  const script = state.voiceScript || { sentences: [], how: [] };
+  const card = $("script-card");
+  card.replaceChildren();
+  script.sentences.forEach((line, i) => {
+    if (i) {
+      const rest = document.createElement("span");
+      rest.className = "script-pause";
+      rest.textContent = "pause: count one";
+      card.append(rest);
+    }
+    const p = document.createElement("p");
+    p.textContent = line;
+    card.append(p);
+  });
+  $("script-how").replaceChildren(...script.how.map((t) => {
+    const li = document.createElement("li");
+    li.textContent = t;
+    return li;
+  }));
+  document.querySelectorAll('input[name="voice-mode"]').forEach((r) => r.addEventListener("change", () => setVoiceMode(r.value)));
+  $("rec-start").addEventListener("click", startRecording);
+  $("rec-stop").addEventListener("click", stopRecording);
+  $("script-file").addEventListener("change", () => { if ($("script-file").files[0]) clearRecording(); });
+  if (!(navigator.mediaDevices && window.MediaRecorder)) {
+    // A browser that cannot record here: a voice memo still works.
+    $("rec-start").hidden = true;
+  }
+  setVoiceMode("script");
+}
+function setVoiceMode(mode) {
+  voiceMode = mode;
+  const script = mode === "script";
+  $("voice-script-panel").hidden = !script;
+  $("voice-clip-panel").hidden = script;
+  $("voice-clip-fields").hidden = script;
+  $("voice-add").textContent = script ? "Check my reading" : "Check this clip";
+  $("voice-error").textContent = "";
+}
+function clearRecording() {
+  recording = null;
+  $("rec-audio").hidden = true;
+  $("rec-audio").removeAttribute("src");
+  $("rec-time").textContent = "";
+}
+async function startRecording() {
+  $("voice-error").textContent = "";
+  $("rec-time").textContent = "Allow the microphone if your browser asks ...";
+  let stream;
+  try {
+    // Echo cancellation and automatic gain make a reference clip worse: the gain
+    // lifts the room's noise in every pause. The browser's noise suppression stays.
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: true },
+    });
+  } catch (_) {
+    $("rec-time").textContent = "";
+    $("voice-error").textContent = "The browser did not let Voxie use the microphone. Allow it for this page, or choose a voice memo below.";
+    return;
+  }
+  clearRecording();
+  $("script-file").value = "";
+  const chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    const type = recorder.mimeType || "audio/webm";
+    const blob = new Blob(chunks, { type });
+    recording = { blob, name: "recording." + (type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm") };
+    $("rec-audio").src = URL.createObjectURL(blob);
+    $("rec-audio").hidden = false;
+    $("rec-start").hidden = false;
+    $("rec-start").textContent = "Record again";
+    $("rec-stop").hidden = true;
+  };
+  const began = Date.now();
+  const tick = setInterval(() => {
+    if (!recorder || recorder.state !== "recording") { clearInterval(tick); return; }
+    $("rec-time").textContent = `${((Date.now() - began) / 1000).toFixed(0)} s: read it, then press Stop`;
+  }, 250);
+  recorder.start();
+  $("rec-start").hidden = true;
+  $("rec-stop").hidden = false;
+  $("rec-time").textContent = "0 s: read it, then press Stop";
+}
+function stopRecording() {
+  if (recorder && recorder.state === "recording") recorder.stop();
+  $("rec-time").textContent = "";
 }
 async function addVoice(e) {
   e.preventDefault();
+  const scripted = voiceMode === "script";
   const fromFile = document.querySelector('input[name="voice-source"]:checked').value === "file";
   const consent = document.querySelector('input[name="consent"]:checked');
   const err = $("voice-error");
   err.textContent = "";
+  if (scripted) {
+    if (!recording && !$("script-file").files[0]) { err.textContent = "Record yourself reading the text, or choose a voice memo of it."; return; }
+  } else if (!$("voice-text").value.trim()) { err.textContent = "Type exactly what is said in the clip."; return; }
   if (!consent) { err.textContent = "Say whose voice it is."; return; }
-  if (!$("voice-text").value.trim()) { err.textContent = "Type exactly what is said in the clip."; return; }
   const data = new FormData();
-  if (fromFile) {
-    if (!$("voice-file").files[0]) { err.textContent = "Choose a file."; return; }
-    data.append("file", $("voice-file").files[0]);
+  if (scripted) {
+    // The server knows the text: it is the one the page showed.
+    data.append("script", "1");
+    if (recording) data.append("file", recording.blob, recording.name);
+    else data.append("file", $("script-file").files[0]);
   } else {
-    if (!$("voice-url").value.trim()) { err.textContent = "Paste a link."; return; }
-    data.append("url", $("voice-url").value.trim());
+    if (fromFile) {
+      if (!$("voice-file").files[0]) { err.textContent = "Choose a file."; return; }
+      data.append("file", $("voice-file").files[0]);
+    } else {
+      if (!$("voice-url").value.trim()) { err.textContent = "Paste a link."; return; }
+      data.append("url", $("voice-url").value.trim());
+    }
+    data.append("start", $("voice-start").value.trim());
+    data.append("end", $("voice-end").value.trim());
+    data.append("text", $("voice-text").value.trim());
   }
-  data.append("start", $("voice-start").value.trim());
-  data.append("end", $("voice-end").value.trim());
-  data.append("text", $("voice-text").value.trim());
   data.append("name", $("voice-name").value.trim());
   data.append("consent", consent.value);
   const button = $("voice-add");
@@ -408,9 +518,17 @@ async function showPreview(r) {
     return li;
   }));
   $("voice-keep-error").textContent = "";
+  // A clip read too fast or run on after each full stop: reading again is the
+  // advice, and the button says so. Keeping it anyway stays possible.
+  const retake = !!r.retake;
+  $("voice-retake").hidden = !retake;
+  $("voice-again").className = retake ? "primary" : "secondary";
+  $("voice-keep").className = retake ? "secondary" : "primary";
+  $("voice-again").textContent = voiceMode === "script" ? "Read it again" : "Try another clip";
+  $("voice-keep").textContent = retake ? "Keep it anyway" : "Keep this voice";
   $("voice-form").hidden = true;
   $("voice-preview").hidden = false;
-  $("voice-keep").focus();
+  (retake ? $("voice-again") : $("voice-keep")).focus();
 }
 function closePreview() {
   stagedVoice = null;
@@ -432,6 +550,8 @@ async function keepVoice() {
     $("voice-more").hidden = false;
     setStatus($("voice-added"), `Added “${r.name}”, ${seconds} seconds.`, "ok");
     $("voice-form").reset();
+    clearRecording();
+    $("script-file").value = "";
   } catch (x) {
     $("voice-keep-error").textContent = x.message;
     busy(button, false);
@@ -445,12 +565,13 @@ async function keepVoice() {
 // the first book was set aside for want of a narrator. "Save and continue"
 // finishes what the reader started instead of walking past it.
 function voiceFormStarted() {
-  return !$("voice-form").hidden && ($("voice-url").value.trim() || $("voice-file").files[0] || $("voice-text").value.trim());
+  return !$("voice-form").hidden && ($("voice-url").value.trim() || $("voice-file").files[0] || $("voice-text").value.trim()
+    || recording || $("script-file").files[0]);
 }
 async function tryAgain() {
   if (stagedVoice) api("/api/voice/discard", { body: { staged: stagedVoice.staged } }).catch(() => {});
   closePreview();
-  $("voice-text").focus();
+  (voiceMode === "script" ? $("rec-start") : $("voice-text")).focus();
 }
 async function saveNarration(e) {
   const button = e.currentTarget;
@@ -640,5 +761,60 @@ function fillDone() {
   $("kobo-install").addEventListener("click", installKobo);
   $("kobo-skip").addEventListener("click", () => { fillDone(); $("done-lead").textContent = "Pair your Kobo later: plug it in and run voxie setup-kobo."; go("done"); });
   initDone();
+  initUpdate();
   go("welcome");
 })();
+
+// -------------------------------------------------------------- update --
+// Voxie changes often at first. The page asks GitHub whether there is a newer
+// version and updates this computer, its watcher and the server in one press
+// (libra_cli/updater.py); the Kobo's plugin changes only with the cable.
+async function checkUpdate() {
+  const status = $("update-status");
+  $("update-btn").hidden = true;
+  $("update-recheck").hidden = true;
+  setStatus(status, "Checking for a newer version ...", "busy");
+  let r;
+  try { r = await api("/api/update/check"); } catch (_) { return; }
+  if (!r.ok) {
+    setStatus(status, r.error, "bad");
+  } else if (!r.behind) {
+    setStatus(status, `Voxie is up to date (${r.current}).`, "ok");
+  } else if (r.can_update) {
+    setStatus(status, `A newer version of Voxie is ready (${r.latest}, ${r.date}).`, "");
+    $("update-btn").hidden = false;
+  } else {
+    setStatus(status, r.note, "bad");
+  }
+  $("update-recheck").hidden = false;
+}
+function initUpdate() {
+  $("update-recheck").addEventListener("click", checkUpdate);
+  $("update-btn").addEventListener("click", async () => {
+    const button = $("update-btn");
+    const log = $("update-log");
+    log.textContent = "";
+    $("update-details").hidden = false;
+    busy(button, true, "Updating ...");
+    $("update-recheck").hidden = true;
+    try {
+      const started = await api("/api/update", { body: {} });
+      if (!started.job) throw new Error("Voxie could not start the update.");
+      const result = await follow(started.job, (line) => {
+        log.textContent += line + "\n";
+        setStatus($("update-status"), line, "busy");
+      });
+      const extra = result.server === "updated" ? " Your server is updated too." : "";
+      setStatus($("update-status"),
+        `Voxie is now ${result.to}.${extra} Close this page and run voxie init again to use the new version.`, "ok");
+      button.hidden = true;
+    } catch (x) {
+      setStatus($("update-status"), x.message, "bad");
+      busy(button, false);
+      $("update-recheck").hidden = false;
+      return;
+    }
+    busy(button, false);
+  });
+  checkUpdate();
+}

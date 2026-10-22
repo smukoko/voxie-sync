@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 
 IS_MAC = sys.platform == "darwin"
@@ -114,6 +115,64 @@ def notify(title, message):
         subprocess.run(cmd, capture_output=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         pass
+
+
+def open_command(path):
+    """The command that opens a file in the user's default app, or None."""
+    if IS_MAC:
+        return ["open", path]
+    if IS_LINUX and shutil.which("xdg-open"):
+        return ["xdg-open", path]
+    return None
+
+
+def open_path(path):
+    """Best effort, like notify(): a failed open must never turn a failed
+    drop into a crashed watcher. Returns whether a command was started."""
+    cmd = open_command(path)
+    if not cmd:
+        return False
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=10)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def docker_answers(run=subprocess.run):
+    if shutil.which("docker") is None:
+        return False
+    try:
+        return run(["docker", "info"], capture_output=True, timeout=60).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def ensure_docker(wait=120, run=subprocess.run, sleep=time.sleep, say=print):
+    """True when Docker answers. On a Mac that has it installed but not running,
+    start Docker Desktop and wait for it (user, 2026-10-22: every first user
+    meets "Docker is installed but not running"; `open -a Docker` is what they
+    would do by hand). It cannot help when Docker Desktop has never been opened
+    (its first launch asks an administrator for a password): then this waits
+    `wait` seconds and gives up, and the caller says so."""
+    if docker_answers(run):
+        return True
+    if not IS_MAC or shutil.which("docker") is None:
+        return False
+    try:
+        started = run(["open", "-a", "Docker"], capture_output=True, timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        started = False
+    if not started:
+        return False
+    say("Starting Docker Desktop (this can take a minute)...")
+    waited = 0
+    while waited < wait:
+        sleep(3)
+        waited += 3
+        if docker_answers(run):
+            return True
+    return False
 
 
 def tool_path_prefix():

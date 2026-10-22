@@ -97,7 +97,7 @@ class Run:
                     "COSY_REF_WAV": os.path.join(work, "clip.wav"), "COSY_REF_TEXT": CLIP_TEXT,
                     "POD_COUNT": "2", "POD_API_WORKERS": "1", "COSY_MAX_WORKERS": "3",
                     "NARRATION_DIRECTOR": "off", "JUNK_PROVIDER": "ai_brain", "JUNK_SHADOW": "none",
-                    "JUNK_BLOCK_FILTER": "off",
+                    "JUNK_BLOCK_FILTER": "off", "VOXIE_LISTEN": "off",
                     # Minutes become seconds; the logic is the same.
                     "BOOT_TIMEOUT_SECONDS": "20", "BOOT_POLL_SECONDS": "1",
                     "PORT_MAPPING_TIMEOUT_SECONDS": "20",

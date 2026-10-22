@@ -93,4 +93,19 @@ def fake_add_voice(**kw):
                          "every sentence. A clip with silence between words is better."]}
 voice.add_voice = fake_add_voice
 
+# The Update button: a newer version is "ready", and updating only pretends.
+from libra_cli import updater
+updater.check = lambda root, run=None: {"current": "a1b2c3d", "latest": "e4f5a6b", "behind": 4, "ahead": 0,
+                                        "dirty": False, "can_update": True, "note": "", "error": "",
+                                        "date": "2026-10-23"}
+def fake_update(on_line, with_server=True):
+    for line in ["Updating a1b2c3d to e4f5a6b (2026-10-23) ...", "Installing what changed (this takes a minute) ...",
+                 "Settings: the junk filter follows your OpenRouter key (JEV with one, local without).",
+                 "Restarting the watcher ...", "Sending the new code to 203.0.113.10 ...",
+                 "Rebuilding the server (a minute or two) ...", "The server is up to date."]:
+        time.sleep(1.0)
+        on_line(line)
+    return {"changed": True, "to": "e4f5a6b", "watcher": "restarted", "server": "updated", "from": "a1b2c3d", "deps": False}
+cli.run_update = fake_update
+
 server.serve(open_browser=os.getenv("NO_BROWSER") is None, port=int(os.getenv("PORT", "0")))

@@ -50,6 +50,10 @@ mfa_workspace/
 # ...and the test harness's baselines, which may only go up (docs/TESTING.md).
 !tools/coverage_baseline.json
 !tools/mutation_baseline.json
+# ...and the junk classifier's model: code, not data. The export once dropped it
+# (`git add -A` honours this file, `git archive` does not), so every public install
+# ran with no junk filter at all and narrated a publisher's sign-up page.
+!safe_models/*.json
 
 # buildx build records downloaded from CI runs.
 *.dockerbuild/

@@ -14,7 +14,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Paths only; this module reads no configuration at import.
-from core import library, platform_support
+from core import failure_report, library, platform_support, progress
 
 # 🚨 ANTI-BLACK-BOX: Force Python to instantly flush prints to the screen
 def print(*args, **kwargs):
@@ -36,22 +36,29 @@ FAILED = os.path.expanduser("~/Kobo_Dropzone_Failed")
 CONFIG_FILE = os.path.expanduser("~/.librasync.json")
 
 
+def cannot_start(message):
+    """Say why the watcher cannot start, on screen as well as in a log nobody
+    reads, and exit. launchd restarts it every few seconds, so the page opens
+    at most once an hour (it is rewritten each time)."""
+    print(f"❌ FATAL: {message}")
+    flag_problem("Voxie could not start", message, "Voxie watcher", "Voxie's watcher could not start",
+                 key="startup", reopen_after=3600)
+    sys.exit(1)
+
+
 def load_gateway_config():
     if not os.path.exists(CONFIG_FILE):
-        print(f"❌ FATAL: Config not found at {CONFIG_FILE}. Run 'voxie init' first.")
-        sys.exit(1)
+        cannot_start(f"Config not found at {CONFIG_FILE}. Run 'voxie init' first.")
     with open(CONFIG_FILE) as f:
         config = json.load(f)
     gateway_ip = config.get("GATEWAY_IP")
     if not gateway_ip:
-        print("❌ FATAL: No GATEWAY_IP found in config. Run 'voxie init' first.")
-        sys.exit(1)
+        cannot_start("No GATEWAY_IP found in config. Run 'voxie init' first.")
     upload_token = config.get("UPLOAD_TOKEN")
     if not upload_token:
         # Nothing here can recover: the gateway rejects tokenless uploads, and a
         # book would be generated on a paid GPU only to be refused on arrival.
-        print("❌ FATAL: No UPLOAD_TOKEN found in config. Re-run 'voxie init'.")
-        sys.exit(1)
+        cannot_start("No UPLOAD_TOKEN found in config. Re-run 'voxie init'.")
     from core.gateway_address import abs_url, gateway_url
     return f"{gateway_url(config)}/upload", upload_token, abs_url(config), config.get("ABS_API_TOKEN")
 
@@ -289,6 +296,11 @@ def retry_pending_uploads():
             trigger_abs_scan()
         else:
             print(f"   -> {name} kept for the next attempt.")
+            flag_problem("Voxie could not send a finished book",
+                         f"{name} is a finished audiobook that could not be uploaded to your server. "
+                         "It stays on this computer and is tried again at every start. Check that "
+                         "your server is running and that this computer reaches it.",
+                         name, "A finished book was not sent")
 
 
 # Held for one book, not the process (core/platform_support.keep_awake: the
@@ -398,8 +410,12 @@ NOT_ENGLISH_EXIT = 5
 notify = platform_support.notify
 
 
-def set_aside(filepath, why):
+def set_aside(filepath, why, report=True):
     """Move a book whose run did not finish out of the drop folder, and say so.
+
+    A failure opens the report page (core/failure_report.py) so the user sees
+    what happened and can ask for help; `report=False` is for a book that is
+    only waiting on a setup step (no narrator voice), where the notice says it.
 
     Returns where it went, or None if it could not be moved (then it stays,
     and the next start narrates it again, as before).
@@ -418,7 +434,36 @@ def set_aside(filepath, why):
     print(f"   📁 Moved to {FAILED}, so it is not narrated again by itself. Drop it back in to try again.")
     notify(f"Voxie could not finish '{os.path.splitext(name)[0]}'",
            f"{why} It is in Kobo_Dropzone_Failed; drop it into Kobo_Dropzone again to retry.")
+    if report:
+        failure_report.show_failure(
+            name, f"{why} The book is in Kobo_Dropzone_Failed; drop it back into Kobo_Dropzone to try again.")
     return dest
+
+
+def friendly_name(filename):
+    """"Winning The Unforgiving Race to Greatness" from a Z-Library style file name
+    ("... (Tim S. Grover) (z-library.sk, 1lib.sk, z-lib.sk).epub"): what a notice says."""
+    import re
+    name = re.sub(r"\s*[\(\[][^\)\]]*[\)\]]", "", os.path.splitext(filename)[0])
+    return re.sub(r"\s+", " ", name).strip() or filename
+
+
+def tell_progress(launched, told):
+    """Desktop notices for what the engine wrote to the progress file since
+    `launched` (a stale file from the last book is not this book's news)."""
+    status = progress.read()
+    if not status or status.get("updated", 0) < launched:
+        return
+    for _, title, message in progress.notice(status, told):
+        notify(title, message)
+
+
+def flag_problem(title, message, name, headline, key="run", reopen_after=failure_report.REOPEN_AFTER):
+    """A problem that is not a book set aside (a failed upload, holes in a
+    narration, a watcher that cannot start): the notice, and the report page
+    so the user can see why and ask for help. Never raises."""
+    notify(title, message)
+    failure_report.show_failure(name, message, headline=headline, key=key, reopen_after=reopen_after)
 
 
 def report_failed(lib_id):
@@ -516,6 +561,12 @@ class GhostHandler(FileSystemEventHandler):
             # not building. Shipping it would upload the wrong book.
             os.remove(EBOOK_READY_MARKER)
 
+        launched = time.time()
+        told = set()
+        if not self.no_audio:
+            notify(f"Voxie started on '{friendly_name(filename)}'",
+                   "Reading the book first. You will be told when you can read it on your Kobo, "
+                   "and how long the audiobook takes.")
         engine_proc = subprocess.Popen(engine_cmd, env=ghost_env)
         shipped_early = False
         early_lib_id = None
@@ -525,7 +576,13 @@ class GhostHandler(FileSystemEventHandler):
                 time.sleep(0.5)
                 early_lib_id = ship_ebook_early(EBOOK_READY_MARKER)
                 shipped_early = True
+                if early_lib_id and not self.no_audio:
+                    notify(f"'{friendly_name(filename)}' is ready to read",
+                           "Sync your Kobo (Wi-Fi on) and open it. The audiobook is being made; "
+                           "you will be told how long it takes, and when it is ready.")
+            tell_progress(launched, told)
             time.sleep(2)
+        tell_progress(launched, told)
 
         if engine_proc.returncode == NO_VOICE_EXIT:
             # Not a crash: a fresh install has no narrator yet. The engine
@@ -536,7 +593,8 @@ class GhostHandler(FileSystemEventHandler):
                    "`voxie voice-add`), then drop the book again for its audiobook.")
             if early_lib_id:
                 report_failed(early_lib_id)
-            set_aside(filepath, "It needs a narrator voice first: run `voxie init` and add one.")
+            set_aside(filepath, "It needs a narrator voice first: run `voxie init` and add one.",
+                      report=False)
             return
         if engine_proc.returncode == NOT_ENGLISH_EXIT:
             # Not a failure: Voxie narrates English only (core/languages.py).
@@ -571,6 +629,11 @@ class GhostHandler(FileSystemEventHandler):
             print("   Uploading anyway -- a book with holes beats no book -- but this "
                   "one is NOT complete.")
             print("   Re-run it once the cause is fixed.")
+            flag_problem(f"Voxie: '{book_name}' is not complete",
+                         f"{len(incomplete)} part(s) of '{book_name}' were never narrated, so the "
+                         "audiobook has gaps. It is uploaded anyway. Look at the log below for the "
+                         "cause, then drop the book into Kobo_Dropzone again.",
+                         filename, "An audiobook has gaps")
         else:
             print("✅ [PHASE 1] Engine finished successfully!")
 
@@ -622,6 +685,13 @@ class GhostHandler(FileSystemEventHandler):
             os.remove(zip_filename)
             print("🗑️ Deleted local Sync Pack.")
             trigger_abs_scan()
+            if self.no_audio or engine_proc.returncode == NOT_ENGLISH_EXIT:
+                notify(f"'{friendly_name(filename)}' is ready to read",
+                       "It is on your server as an ebook. Sync your Kobo (Wi-Fi on) and open it.")
+            elif not incomplete:
+                # A book with holes was already flagged; "ready" would be false.
+                progress.update("done", say=True)
+                tell_progress(launched, told)
             # Consumed. Leaving it would let a later run that failed before
             # writing its own marker package this book again under that book's
             # name.
@@ -640,6 +710,12 @@ class GhostHandler(FileSystemEventHandler):
             os.makedirs(ARCHIVE, exist_ok=True)
             shutil.move(filepath, os.path.join(ARCHIVE, filename))
             print(f"   -> {filename} moved to the Archive: its audiobook is in the pack.")
+            flag_problem(f"Voxie could not send '{book_name}'",
+                         f"'{book_name}' is narrated, but the upload to your server failed. "
+                         "The finished audiobook is kept on this computer and is sent again when the "
+                         "watcher restarts (voxie start-ghost). Check that your server is running and "
+                         "that this computer reaches it.",
+                         filename, "A finished book was not sent")
 
         print(f"👻 Ghost going back to sleep.\n{'='*50}")
 

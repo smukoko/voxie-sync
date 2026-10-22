@@ -326,6 +326,26 @@ check("and the pool size falls back to POD_COUNT, for when stock returns", n == 
 
 print("\n🎛️  How many pods a book gets")
 
+# 2026-10-22: Winning (6.9 h of audio, an A5000 at $0.27) ran on ONE pod because
+# POD_COUNT defaulted to 1: 48 minutes of narrating, 75 in all, for $0.29 of a
+# budget that paid for two. The default is now "up to 4", cut by the dollar rule.
+import re as _re
+check("POD_COUNT defaults to 4, not 1 (the budget cuts it)",
+      _re.search(r'POD_COUNT = int\(os\.getenv\("POD_COUNT", "4"\)\)', open(eng.__file__).read()))
+eng.cost_plan.set_other_spend(0.05, 7.8)
+spd = eng.cost_plan.SPEED["NVIDIA RTX A5000"]
+winning = eng.cost_plan.pods_for(7.8, 0.27, spd, 4)
+check("Winning on an A5000 gets four pods: 26 minutes, not 65, inside its budget and allowance",
+      winning == 4, f"({winning})")
+check("...and they cost under what the book is allowed",
+      eng.cost_plan.book_cost(0.27, spd, 7.8, 4) + 0.05 <= eng.cost_plan.allowed_dollars(7.8) + 0.05)
+check("the allowance is for boots only: without it the same book gets fewer",
+      (os.environ.__setitem__("VOXIE_SPEED_ALLOWANCE", "0"), eng.cost_plan.pods_for(7.8, 0.27, spd, 4))[1] < 4)
+os.environ.pop("VOXIE_SPEED_ALLOWANCE", None)
+eng.cost_plan.set_other_spend(0.0, 0.0)
+check("a 16-hour book gets all four",
+      eng.cost_plan.pods_for(16.0, 0.27, spd, 4) == 4)
+
 
 async def a5000_only():
     return {("NVIDIA RTX A5000", "SECURE"): 0.27}

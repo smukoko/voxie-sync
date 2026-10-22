@@ -30,7 +30,7 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from core import accounts, links
 from core.gateway_address import abs_url, gateway_url, parse_gateway
 from libra_cli import main as cli
-from libra_cli import server_setup
+from libra_cli import server_setup, voice_script
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 LOGO_DIR = os.path.join(cli.repo_root_dir(), "assets", "logo")
@@ -136,6 +136,7 @@ def create_app(key, port_holder):
             "templateId": cli.RUNPOD_PUBLIC_TEMPLATE_ID or env.get("RUNPOD_TEMPLATE_ID", ""),
             "publicTemplate": bool(cli.RUNPOD_PUBLIC_TEMPLATE_ID),
             "voices": list(available()),
+            "voiceScript": voice_script.as_dict(),
             "sshKey": server_setup.public_key(),
             "links": {"hetzner": links.HETZNER_URL, "runpod": links.RUNPOD_URL,
                       "openrouter": links.OPENROUTER_URL,
@@ -327,9 +328,13 @@ def create_app(key, port_holder):
             tmpdir = tempfile.mkdtemp(prefix="voxie-voice-")
             path = os.path.join(tmpdir, os.path.basename(f.filename))
             f.save(path)
-        url = (form.get("url") or "").strip() or None
+        # The text the page showed to be read (libra_cli/voice_script.py): the
+        # recording is the whole clip, and its words are known.
+        scripted = form.get("script") == "1"
+        url = None if scripted else (form.get("url") or "").strip() or None
         if not (url or path):
-            return jsonify({"ok": False, "error": "Paste a link or choose a file."})
+            return jsonify({"ok": False, "error": "Record yourself reading the text, or choose a file."
+                            if scripted else "Paste a link or choose a file."})
         name = slug(form.get("name") or "")
         if name and os.path.exists(os.path.join(VOICES_DIR, f"{name}.wav")):
             if tmpdir:
@@ -341,8 +346,10 @@ def create_app(key, port_holder):
             job.log("Cutting the clip and listening to it ...")
             stage = tempfile.mkdtemp(prefix="voxie-voice-stage-")
             try:
-                r = add_voice(url=None if path else url, file=path, start=form.get("start") or None,
-                              end=form.get("end") or None, text=form.get("text", ""),
+                r = add_voice(url=None if path else url, file=path,
+                              start=None if scripted else form.get("start") or None,
+                              end=None if scripted else form.get("end") or None,
+                              text=voice_script.TEXT if scripted else form.get("text", ""),
                               name=form.get("name") or None, language=form.get("language") or "en",
                               consent=form.get("consent"), source_name=f.filename if path else None,
                               voices_dir=stage)
@@ -355,7 +362,8 @@ def create_app(key, port_holder):
             token = uuid.uuid4().hex
             staged[token] = {"dir": stage, "name": r["name"]}
             return {"staged": token, "name": r["name"], "seconds": r["seconds"],
-                    "warnings": r["warnings"], "heard": r.get("heard"), "advice": r.get("advice")}
+                    "warnings": r["warnings"], "heard": r.get("heard"), "advice": r.get("advice"),
+                    "retake": bool(r.get("retake"))}
         return start(work)
 
     @app.get("/api/voice/preview/<token>")
@@ -383,6 +391,27 @@ def create_app(key, port_holder):
     def voice_discard():
         drop_staged(body().get("staged") or "")
         return jsonify({"ok": True})
+
+    # ------------------------------------------------------------- update --
+    @app.get("/api/update/check")
+    def update_check():
+        from libra_cli import updater
+        info = updater.check(cli.repo_root_dir())
+        return jsonify({"ok": not info["error"], **info})
+
+    @app.post("/api/update")
+    def update_now():
+        from libra_cli import updater
+        with_server = bool(body().get("server", True))      # read here: the job runs outside the request
+
+        def work(job):
+            try:
+                done = cli.run_update(job.log, with_server=with_server)
+            except updater.UpdateError as e:
+                raise RuntimeError(str(e)) from None
+            return {"changed": done["changed"], "to": done["to"], "watcher": done["watcher"],
+                    "server": done["server"]}
+        return start(work)
 
     @app.post("/api/watcher")
     def watcher():

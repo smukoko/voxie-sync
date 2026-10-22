@@ -407,7 +407,8 @@ def main():
     check_config(env, cfg)
     if env.get("GROQ_API_KEY"):
         check_groq(env)
-    if env.get("JUNK_PROVIDER", "ai_brain") in ("jev", "shadow"):
+    if env.get("JUNK_PROVIDER", "auto") in ("jev", "shadow") or (
+            env.get("JUNK_PROVIDER", "auto") == "auto" and (env.get("OPENROUTER_API_KEY") or env.get("OPEN_ROUTER_API_KEY"))):
         check_jev(env)
     if env.get("RUNPOD_API_KEY"):
         check_runpod(env)

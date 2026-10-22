@@ -2,6 +2,8 @@
 # Every offline suite: no GPU, no network. Exits non-zero if any fails.
 # test_fat_check needs Docker and skips loudly without it.
 cd "$(dirname "$0")/.." || exit 1
+# Tests that drive the engine would write the real progress file (core/progress.py).
+export VOXIE_STATUS_FILE="$(mktemp -d)/voxie-status.json"
 failed=()
 for t in tools/test_*.py; do
     if out=$(python -u "$t" 2>&1 </dev/null); then

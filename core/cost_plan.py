@@ -142,10 +142,33 @@ def candidates(prices, budget=None, speed=None):
     return [(gpu, cloud, price, top) for _, gpu, cloud, price, top in sorted(rows)]
 
 
+# A boot costs the same for a short book as for a long one, so a share of the
+# budget proportional to length leaves a 7-hour book too little to pay for the
+# pods that would make it 25 minutes faster (user, 2026-10-22: more pods, yes).
+# Dollars a book may spend beyond its share, on boots only; it fades to nothing
+# at 16 hours, so the promise ($1.00 for a 16-hour book, everything counted) is
+# exactly what it was. VOXIE_SPEED_ALLOWANCE=0 turns it off.
+def speed_allowance():
+    try:
+        return max(0.0, float(os.getenv("VOXIE_SPEED_ALLOWANCE", "0.20")))
+    except ValueError:
+        return 0.20
+
+
+def allowance_for(hours):
+    """The speed allowance a book of `hours` gets: all of it for a short one, none at 16 hours."""
+    return speed_allowance() * max(0.0, 1.0 - hours / BOOK_HOURS)
+
+
+def allowed_dollars(hours, budget=None):
+    """What the GPU of a book of `hours` may cost: its share of the budget, and the allowance."""
+    return gpu_budget_16h(budget) * max(hours, 1.0) / BOOK_HOURS + allowance_for(hours)
+
+
 def pods_for(hours, price, speed, wanted, budget=None, boot_hours=BOOT_HOURS):
     """How many pods of one card a book of `hours` may use: at most `wanted`,
-    and only as many as keep it within its share of the budget."""
-    allowed = gpu_budget_16h(budget) * max(hours, 1.0) / BOOK_HOURS
+    and only as many as keep it within what `allowed_dollars` says."""
+    allowed = allowed_dollars(hours, budget)
     n = max(1, wanted)
     while n > 1 and book_cost(price, speed, hours, n, boot_hours) > allowed:
         n -= 1

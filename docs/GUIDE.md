@@ -143,10 +143,25 @@ Each EPUB is a few megabytes; keeping them costs little.
 
 Alignment (Montreal Forced Aligner) runs locally in Docker on every route.
 
-**A voice of your own (GPU routes).** No voice ships with Voxie. Add one from
-an 8–15 second clip of someone who agreed to it, from a YouTube link or an
-audio or video file: on the setup page (**Narrator voice**) or with
-`voxie voice-add … --consent self`. The consent is recorded with the voice.
+**A voice of your own (GPU routes).** No voice ships with Voxie. The setup page
+(**Narrator voice**) gives you three short sentences to read aloud and records
+them right there; `voxie voice-script` prints the same text for a voice memo
+(`voxie voice-add --script --file memo.m4a --consent self`). Read slowly, with a
+full second after each full stop: the narrator copies how you read, pauses
+included, and Voxie tells you to read it again when the pauses are too short or
+you read too fast. You can also use an 8–15 second clip of someone who agreed to
+it, from a YouTube link or an audio or video file
+(`voxie voice-add … --consent permission`). The consent is recorded with the voice.
+
+**Updating.** Voxie changes often at first. On the setup page (`voxie init`) the
+first screen says when a newer version exists and has an **Update Voxie** button;
+`voxie update` does the same from a terminal. It updates this computer, restarts
+the watcher (after the current book, if one is being narrated) and updates your
+server. The Kobo's plugin changes only when you run `voxie setup-kobo` again.
+
+**What is happening to your book.** You get a notice when the ebook can be read on
+your Kobo, how long the audiobook will take, and when it is ready; `voxie status`
+says where a book is at any time.
 
 ## Listening on your phone
 

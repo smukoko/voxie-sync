@@ -229,7 +229,8 @@ def add_voice(*, text, consent, url=None, file=None, start=None, end=None,
         # What the clip check heard, so a voice that narrates oddly can be
         # traced to its clip later.
         "check": {"by": report.get("checked_by"), "heard": report.get("heard"),
-                  "match": report.get("match"), "trimmed_to": report.get("trim")},
+                  "match": report.get("match"), "trimmed_to": report.get("trim"),
+                  "pace": report.get("pace")},
         "consent": {"basis": consent, "statement": CONSENT[consent],
                     "confirmed_by": by or os.environ.get("USER") or "unknown",
                     "confirmed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")},
@@ -244,4 +245,7 @@ def add_voice(*, text, consent, url=None, file=None, start=None, end=None,
         warnings.append(f"{seconds:.1f}s works, but 8-15 seconds captures accent and rhythm better.")
     return {"name": name, "label": sidecar["label"], "seconds": round(seconds, 2),
             "lufs": lufs, "language": language, "path": dest, "warnings": warnings,
-            "heard": report.get("heard"), "match": report.get("match"), "advice": clip_check.MOOD_ADVICE}
+            "heard": report.get("heard"), "match": report.get("match"), "advice": clip_check.MOOD_ADVICE,
+            # True when the clip would teach the narrator to hurry (read too fast, or
+            # the next sentence started under half a second after a full stop).
+            "retake": bool(report.get("retake")), "pace": report.get("pace")}

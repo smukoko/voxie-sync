@@ -31,7 +31,7 @@ from core.structure import (boilerplate_phrases_in, structural_junk,
                             read_toc, drop_gutenberg_front_matter, drop_gutenberg_title_page, drop_printed_contents,
                             narratable_blocks,
                             drop_repeated_title, trim_credits, opening_credit,
-                            is_dedication)
+                            is_dedication, publisher_furniture)
 from core.tts_worker import (runpod_worker, process_mfa_factory,
                              stitch_audio_chapters, pod_chunk_key)
 from core.tts_providers import get_provider, PROVIDERS
@@ -48,7 +48,7 @@ from core.parser import (
 )
 from core.chunking import pack_blocks, chunk_text
 from core.narration import narrate_text, load_errata, apply_errata
-from core import cost_plan, pod_pool
+from core import cost_plan, pod_pool, progress, narration_check
 from core import chunk_cache
 from core import drm, platform_support
 # Set from --voice at startup; None means "use COSY_VOICE or the only
@@ -325,6 +325,7 @@ async def deploy_burner_pod():
             )
 
         wait = min(CAPACITY_POLL_SECONDS, remaining)
+        progress.update("waiting_gpu", say=False)
         print(f"\n😴 Every card is busy. Waiting {int(wait)}s and sweeping again "
               f"({int(remaining // 60)}m of budget left). Nothing is billing.")
         await asyncio.sleep(wait)
@@ -1071,14 +1072,41 @@ async def wait_for_generation(join_task, consumers, pool, acquisition, wanted_po
 # a host that keeps failing is not worth a third.
 MAX_POD_REPLACEMENTS = int(os.getenv("MAX_POD_REPLACEMENTS", "2"))
 
-# How many pods one book may use. One is the shape everything before this
-# assumed and stays the default: more pods multiply the bill as well as the
-# speed, so it is an opt-in rather than a tuning knob discovered by accident.
-POD_COUNT = int(os.getenv("POD_COUNT", "1"))
+# How many pods one book may use, at most; the dollar rule (core/cost_plan.py,
+# planned_pod_count) cuts it to what the book's budget pays for. The default was
+# 1 on the belief that more pods multiply the bill. They do not: the same audio
+# costs the same GPU-hours however many pods share it, and each extra pod adds
+# only its boot (about 13 minutes of its price). On 2026-10-22 a 6.9-hour book
+# on one A5000 took 48 minutes to narrate and 75 in all, for $0.29 of a budget
+# that allowed two pods; the user's first complaint was the hour.
+POD_COUNT = int(os.getenv("POD_COUNT", "4"))
 
 
 # What this run has spent besides the GPU; the cartographer fills it in.
 RUN_SPEND = {"openrouter": 0.0}
+
+
+PROGRESS_SECONDS = 30
+
+
+async def report_narration_progress(narration_plan, mfa_dir, audio_hours):
+    """Tell the progress file how much of the text has audio, every half minute,
+    with the time left (narrating, then the finishing steps). Counted in
+    characters: the longest chunks go first (see the queue below), so a count of
+    chunks would promise the end too soon. Cancelled when narration ends."""
+    total = sum(len(c.get("text", "")) for c in narration_plan) or 1
+    started = time.monotonic()
+    while True:
+        await asyncio.sleep(PROGRESS_SECONDS)
+        try:
+            done = sum(len(c.get("text", "")) for c in narration_plan
+                       if os.path.exists(os.path.join(
+                           mfa_dir, (c["filename"][:-4] if c["filename"].endswith(".mp3") else c["filename"]) + ".wav")))
+            left = progress.narration_eta(done, total, time.monotonic() - started)
+            progress.update("narrating", say=False, done=done, total=total,
+                            eta_minutes=None if left is None else round(left + progress.finishing_minutes(audio_hours)))
+        except Exception:
+            pass
 
 
 async def planned_pod_count(narration_plan):
@@ -1097,7 +1125,7 @@ async def planned_pod_count(narration_plan):
     count = cost_plan.pods_for(hours, price, speed, POD_COUNT)
     cost = cost_plan.book_cost(price, speed, hours, count)
     other = RUN_SPEND["openrouter"]
-    allowed = cost_plan.budget_16h() * max(hours, 1.0) / cost_plan.BOOK_HOURS
+    allowed = cost_plan.budget_16h() * max(hours, 1.0) / cost_plan.BOOK_HOURS + cost_plan.allowance_for(hours)
     print(f"\n💰 About {hours:.1f} h of audio. On {count} {card['name']} pod(s) at ${price:.2f}/h: "
           f"about ${cost:.2f} and {60 * (hours / speed / count + cost_plan.BOOT_HOURS):.0f} min"
           + (f", plus ${other:.2f} already spent on OpenRouter (the director, the filters)" if other else "")
@@ -1105,6 +1133,8 @@ async def planned_pod_count(narration_plan):
           f"(${cost_plan.budget_16h():.2f} per 16 h).")
     if count < POD_COUNT:
         print(f"   POD_COUNT is {POD_COUNT}; {count} keep(s) the budget, so {count} it is.")
+    progress.update("starting_gpu", audio_hours=round(hours, 2), eta_minutes=round(
+        60 * (hours / speed / count + cost_plan.BOOT_HOURS) + progress.finishing_minutes(hours)))
     return count
 
 
@@ -1760,12 +1790,18 @@ async def cartographer_producer(epub_path, audio_queue, book_id, language=None):
                 # Publishers write it down in the OPF guide or the navigation
                 # landmarks; believing them beats guessing from an embedding.
                 declared = structural_verdict.get(full_href)
+                # Recognised from its own words, before any classifier: a model
+                # that is missing or down must not read a sign-up page aloud.
+                furniture = "" if (declared or dedication) else publisher_furniture(raw_text_lines, rho)
                 if declared:
                     verdict = "JUNK"
                     print(f"   🏷️  {href}: JUNK, declared by the book ({declared})")
                 elif dedication:
                     verdict = "KEEP"
                     print(f"   💐 {href}: the dedication, kept")
+                elif furniture:
+                    verdict = "JUNK"
+                    print(f"   🏷️  {href}: JUNK, {furniture}")
                 else:
                     try:
                         decision = await junk_provider.classify(
@@ -1880,7 +1916,8 @@ async def cartographer_producer(epub_path, audio_queue, book_id, language=None):
                         safe = re.sub(r'[\\/*?:"<>|]', "", seg_title)
                         if director_jev:
                             directions = await director.direct_blocks(
-                                [t for _, t in seg_blocks], language or DEFAULT_LANGUAGE, director_jev)
+                                [t for _, t in seg_blocks], language or DEFAULT_LANGUAGE, director_jev,
+                                book=f"{book_title} by {book_author}", chapter=seg_title)
                             book_directions.extend(directions)
                             runs = director.group_by_direction(seg_blocks, directions)
                         else:
@@ -2053,9 +2090,9 @@ def check_prerequisites(mfa_dir, language=None, own_server=False):
     if shutil.which("docker") is None:
         missing.append("Docker not found on PATH (needed for Montreal Forced Aligner)")
     else:
-        docker_check = subprocess.run(["docker", "info"], capture_output=True)
-        if docker_check.returncode != 0:
-            missing.append("Docker is installed but not running (start Docker Desktop)")
+        if not platform_support.ensure_docker():
+            missing.append("Docker is installed but not running (open Docker Desktop and wait until it "
+                           "says it is running; the first time, it asks for an administrator's password)")
 
     if language is not None:
         try:
@@ -2231,6 +2268,7 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
                   f"using '{language_override}'.")
         book_language = language_override
     print(f"\n📖 BOOK DETECTED: '{book_title}' by {book_author}")
+    progress.update("reading", book=book_title)
 
     # English only (user, 2026-10-07): decided before anything is converted or
     # billed. Another language goes the ebook-only way, as from
@@ -2297,6 +2335,7 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
     # The book is readable from here. Everything a reader needs is on disk and
     # the GPU has not been touched yet, so say so now rather than in two hours.
     publish_ebook_early(ebook_dir, librarian_id, book_id, db_path, book_title)
+    progress.update("ebook_ready")
     preflight_voice(book_language)
 
     # Build the whole narration plan with nothing billing. cartographer_producer
@@ -2432,12 +2471,23 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
         # the pool instead of on the GPU, which looks exactly like a slow model.
         custom_limits = httpx.Limits(max_connections=256, max_keepalive_connections=256)
 
+        # Hears each chunk as it lands (core/narration_check.py): the aligner
+        # places a mangled word without a murmur, Whisper does not. VOXIE_LISTEN=off
+        # turns it off; with no Whisper installed it is off by itself.
+        slips = narration_check.SlipListener(narration_plan, mfa_dir)
+        if os.getenv("VOXIE_LISTEN", "auto").strip().lower() == "off" or cpu_route():
+            # The free route (Kokoro on this CPU) has no pods to retake on.
+            slips.listen = None
+        if not slips.enabled and not cpu_route() and os.getenv("VOXIE_LISTEN", "auto").strip().lower() != "off":
+            print("   👂 No Whisper here (mlx-whisper, or faster-whisper): chunks are not listened to.")
+
         async with httpx.AsyncClient(limits=custom_limits) as client:
             # Workers are bound to one pod for the life of the run. Not per
             # request: a provider registers its speaker with one server, so a
             # worker that moved would hit a server that has never heard of its
             # narrator -- which is the 163-HTTP-404 incident, rediscovered.
             consumers = []
+            narrating = {"ticker": None, "listener": None}
 
             async def start_workers_for(pod_id, base_url, gpu_workers):
                 """Put this pod to work the moment it serves.
@@ -2456,6 +2506,15 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
                         base_url, tts_provider, pod_urls=pool.urls, pool=pool)))
                 print(f"   🌩️  +{n} worker(s) on {pod_id} "
                       f"({len(consumers)} narrating now).")
+                if narrating["ticker"] is None:
+                    # The first pod is serving: from here the pace is measured.
+                    chars = sum(len(c.get("text", "")) for c in narration_plan)
+                    hours = cost_plan.audio_hours(chars)
+                    progress.update("narrating", done=0, total=chars, audio_hours=round(hours, 2))
+                    narrating["ticker"] = asyncio.create_task(
+                        report_narration_progress(narration_plan, mfa_dir, hours))
+                    if slips.enabled:
+                        narrating["listener"] = asyncio.create_task(slips.watch())
 
             wanted_pods = 0     # rented pods; a replacement is rented only for those
             if tts_url:
@@ -2518,6 +2577,10 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
 
             for c in consumers:
                 await c
+            if narrating["ticker"] is not None:
+                narrating["ticker"].cancel()
+            if narrating["listener"] is not None:
+                narrating["listener"].cancel()
 
         active_pod_id = pool.pods[0][0] if pool.pods else None
 
@@ -2561,6 +2624,7 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
         # aligning is on them. This is the one step that has to happen with the
         # GPUs still billing, and it is worth it: a couple of minutes of pod time
         # against 65 minutes of emulated MFA on this Mac.
+        progress.update("aligning")
         if pod_alignment:
             print("\n🧠 PHASE 2a: Collecting word timings from the pods...")
             try:
@@ -2572,8 +2636,25 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
                 print(f"   ⚠️  Pod alignment failed ({str(e)[:100]}); "
                       "falling back to the local aligner.")
             else:
+                # A chunk that does not say its text is refused as if the aligner
+                # had refused it: its word timings go, and it is narrated again.
+                if slips.enabled:
+                    suspects = await slips.finish()
+                    for base in suspects:
+                        try:
+                            os.remove(os.path.join(mfa_output_dir, base + ".json"))
+                        except OSError:
+                            pass
                 await retake_refused(pool, narration_plan, mfa_dir, mfa_output_dir, db_path, run_id,
                                      book_language, key_to_name, tts_provider)
+                if slips.enabled and slips.suspects:
+                    # The retakes, heard again: said, not retaken a third time.
+                    again = set(slips.suspects)
+                    slips.heard -= again
+                    slips.suspects.clear()
+                    await slips.finish()
+                    print(f"   👂 After the retakes {len(slips.suspects)} of {len(again)} still do not "
+                          "say their text.")
 
         # 👇 KILL THE PODS EARLY TO SAVE MONEY
         # Every one of them, before stitching -- which is minutes of local CPU
@@ -2611,10 +2692,11 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
         process_mfa_factory(mfa_dir, audio_dir, db_path, librarian_id, book_title, book_author)
 
         # --- PHASE 3.5: THE AUDIO STITCHER ---
+        progress.update("stitching", eta_minutes=None)
         stitch_audio_chapters(audio_dir, book_title, book_author, librarian_id)
 
         # --- FINALIZATION ---
-        apply_global_time_offsets(db_path, book_id)
+        total_seconds = apply_global_time_offsets(db_path, book_id)
 
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -2669,6 +2751,9 @@ async def main(epub_path, use_pod=None, language_override=None, tts_url=None):
         # into a GPU bill while the pods are already running.
         chunk_cache.enforce_budget()
 
+        # Handed to the watcher, which sends the pack and says when it is done.
+        progress.update("uploading", eta_minutes=None, **(
+            {"audio_hours": round(total_seconds / 3600, 2)} if total_seconds else {}))
         print("\n🎉 SUCCESS! Factory processing complete.")
 
     finally:

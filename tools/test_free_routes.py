@@ -175,8 +175,29 @@ from dotenv import dotenv_values  # noqa: E402
 example = dotenv_values(os.path.join(ROOT, ".env.example"))
 check(".env.example narrates on the CPU", example.get("TTS_PROVIDER") == "kokoro",
       f"({example.get('TTS_PROVIDER')})")
-check("with the local junk filter", example.get("JUNK_PROVIDER") == "ai_brain"
-      and example.get("JUNK_BLOCK_FILTER", "off") == "off")
+# JUNK_PROVIDER and JUNK_BLOCK_FILTER are "auto": the local classifier and no block
+# filter without an OpenRouter key (the free route), JEV and the block filter with one.
+from core import block_filter, junk_provider  # noqa: E402
+check(".env.example leaves the junk filter to auto", example.get("JUNK_PROVIDER") == "auto"
+      and example.get("JUNK_BLOCK_FILTER") == "auto")
+no_key = {"JUNK_PROVIDER": "auto"}
+check("with no key, auto is the local junk filter and no block filter",
+      junk_provider.resolved_choice(no_key) == "ai_brain"
+      and not junk_provider.has_openrouter_key(no_key))
+saved = {k: os.environ.pop(k, None) for k in ("OPENROUTER_API_KEY", "OPEN_ROUTER_API_KEY", "JUNK_BLOCK_FILTER")}
+check("...nor a block filter", block_filter.mode() == "off")
+os.environ["OPENROUTER_API_KEY"] = "k"
+check("with a key, auto is JEV and the block filter is on",
+      junk_provider.resolved_choice({"OPENROUTER_API_KEY": "k"}) == "jev" and block_filter.mode() == "on")
+check("either spelling of the key counts", junk_provider.resolved_choice({"OPEN_ROUTER_API_KEY": "k"}) == "jev")
+check("an explicit choice is never overridden",
+      junk_provider.resolved_choice({"JUNK_PROVIDER": "ai_brain", "OPENROUTER_API_KEY": "k"}) == "ai_brain")
+os.environ["JUNK_BLOCK_FILTER"] = "off"
+check("and neither is an explicit block filter", block_filter.mode() == "off")
+for k, v in saved.items():
+    os.environ.pop(k, None)
+    if v is not None:
+        os.environ[k] = v
 keys = ("GROQ_API_KEY", "OPENROUTER_API_KEY", "RUNPOD_API_KEY", "RUNPOD_TEMPLATE_ID",
         "RUNPOD_URL_PATTERN", "TYPESAFE_API_KEY", "TTS_API_TOKEN")
 filled = [k for k in keys if (example.get(k) or "").strip()]

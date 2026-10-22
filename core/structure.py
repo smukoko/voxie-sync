@@ -298,6 +298,63 @@ def boilerplate_phrases_in(text):
     return [phrase for phrase in BOILERPLATE_PHRASES if phrase in lowered]
 
 
+# --- Publisher furniture that no landmark names -----------------------------
+#
+# Simon & Schuster ships two sign-up pages in every ebook ("Thank you for
+# downloading this Simon & Schuster ebook. Get a FREE ebook when you join our
+# mailing list... CLICK HERE TO SIGN UP"), declared by no landmark. Winning's
+# first narrated words were that page (2026-10-22) because the classifier that
+# should have cut it had no model on that install; and a classifier is a guess
+# where this is a fact, so the pages are recognised from their own words first.
+#
+# Narrow on purpose, like every rule that only ever adds JUNK verdicts: a short
+# document at the edge of the book (never a chapter in the middle), and either
+# one phrase nobody writes in a story, or two ordinary ones together.
+_PROMO_STRONG = (
+    "thank you for downloading this", "thanks for downloading this",
+    "we hope you enjoyed reading this", "join our mailing list",
+    "sign up for our newsletter", "sign up for the newsletter", "click here to sign up",
+    "click below to sign up", "sign up to receive updates",
+)
+_PROMO_WEAK = (
+    "newsletter", "mailing list", "sign up", "subscribe", "subscriber", "click here",
+    "click below", "exclusive offers", "free ebook", "new releases", "follow us",
+    "visit us at", "special offers", "unsubscribe", "register this ebook",
+)
+_PROMO_MAX_WORDS = 250
+# A front or back matter document: the first or last tenth of the spine.
+_EDGE = 0.1
+# "Also by the author" and its cousins, as the document's first words.
+_ALSO_BY = re.compile(
+    r"^\W*(?:also by|other (?:books|titles|works) by|more (?:books|titles) by|books by|"
+    r"by the same author|also available from)\b", re.I)
+_ALSO_BY_MAX_WORDS = 150
+
+
+def publisher_furniture(texts, position):
+    """Why a whole document is the publisher's and not the author's, or "".
+
+    `texts` are the document's blocks; `position` is its place in the spine,
+    0.0 for the first document and 1.0 for the last. Only a document at either
+    edge is ever asked: a short chapter in the middle that happens to say "sign
+    up" is the author's.
+    """
+    if _EDGE < position < 1 - _EDGE:
+        return ""
+    texts = [t for t in texts if t and t.strip()]
+    if not texts:
+        return ""
+    words = sum(len(t.split()) for t in texts)
+    lowered = " ".join(texts).lower().replace("’", "'")
+    if words <= _ALSO_BY_MAX_WORDS and _ALSO_BY.match(texts[0]):
+        return "a list of the author's other books"
+    if words <= _PROMO_MAX_WORDS:
+        if any(cue in lowered for cue in _PROMO_STRONG) or \
+                sum(cue in lowered for cue in _PROMO_WEAK) >= 2:
+            return "the publisher's sign-up page"
+    return ""
+
+
 # --- Chapter numbers the model cannot read ---------------------------------
 #
 # A heading that is a bare Roman numeral is narrated letter by letter, because

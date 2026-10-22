@@ -100,6 +100,24 @@ if grep -q "ref=REFERRAL_CODE_HERE" "$dest/core/links.py" "$dest/README.md" "$de
     exit 1
 fi
 
+# --- Dropped files ------------------------------------------------------------
+# `git archive` exports tracked files whatever .gitignore says; the commit below
+# is made with `git add -A`, which honours it. A tracked file that .gitignore
+# also matches therefore silently goes missing from the public repo: on
+# 2026-10-22 that was the junk classifier's model, and every public install ran
+# without a junk filter. Ask git what it would drop, in a throwaway index.
+probe="$(mktemp -d)"
+git --git-dir="$probe" init -q
+git --git-dir="$probe" --work-tree="$dest" add -A
+dropped="$(git --git-dir="$probe" --work-tree="$dest" ls-files --others --ignored --exclude-standard)"
+rm -rf "$probe"
+if [ -n "$dropped" ]; then
+    echo "Export stopped: .gitignore would drop these tracked files from the public repo:" >&2
+    echo "$dropped" | sed 's/^/    /' >&2
+    echo "Add a '!path' exception to .gitignore, commit, and export again." >&2
+    exit 1
+fi
+
 # --- Leak check ---------------------------------------------------------------
 if ! python3 tools/leak_scan.py "$dest"; then
     echo "Export stopped: fix the above in the source repo, commit, and export again." >&2

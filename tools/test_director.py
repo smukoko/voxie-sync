@@ -53,7 +53,8 @@ check("every delivery maps to a known instruction and tag, and no speed is ever 
       all((d.instruct is None or d.instruct in INSTRUCTIONS) and (d.tag == "" or d.tag in TAGS)
           for d in DELIVERIES.values())
       and all(direction_for(k, "en", p).speed == 1.0 for k in DELIVERIES for p in (0.0, 0.9)))
-check("JEV is asked only the baseline's two questions", set(director.QUESTIONS) == {"delivery", "breath_before"})
+check("JEV is asked the baseline's two questions and whether the line is a scene",
+      set(director.QUESTIONS) == {"delivery", "breath_before", "register"})
 check("JEV is offered exactly the menu",
       set(director.QUESTIONS["delivery"]["criteria"]) == set(DELIVERIES))
 
@@ -92,11 +93,75 @@ check("an outage costs the direction, not the paragraph", ds[2] == PLAIN)
 check("JEV reads the neighbours", "Chapter One." in jev.calls[0]["before"]
       and "Nobody" in jev.calls[0]["after"])
 
+# --- 3b. Only a clear choice, only a scene (2026-10-22) ------------------------------
+# Winning, a self-help book: 69% of 1,304 paragraphs were acted (angry 329, heavy
+# 361), some at 0.44 against plain's 0.42; with the gates, 8%.
+def answers(choice, p, scene=None, plain=None):
+    probs = {"plain": plain if plain is not None else round(1 - p, 2), choice: p}
+    out = {"delivery": {"choice": choice, "probabilities": probs}, "breath_before": {"noul": 0.1}}
+    if scene is not None:
+        out["register"] = {"choice": "scene", "probabilities": {"scene": scene, "exposition": 1 - scene}}
+    return out
+
+
+settle = director.settle
+check("a clear delivery in a scene is used", settle(answers("hushed", 0.85, scene=0.9)) == "hushed")
+check("a coin flip against plain is plain (Winning: heavy 0.44 vs plain 0.42)",
+      settle(answers("heavy", 0.44, scene=0.9, plain=0.42)) == "plain")
+check("beating plain by the margin is used, by less is not",
+      settle(answers("angry", 0.5, scene=0.9, plain=0.4)) == "angry"
+      and settle(answers("angry", 0.5, scene=0.9, plain=0.41)) == "plain")
+check("an author arguing is read plainly however angry it sounds",
+      settle(answers("angry", 0.95, scene=0.1)) == "plain")
+check("plain stays plain", settle(answers("plain", 0.9, scene=0.1)) == "plain")
+check("answers without probabilities are taken as before (an older JEV, a fake)",
+      settle({"delivery": {"choice": "hushed"}, "breath_before": {"noul": 0.1}}) == "hushed")
+
+
+class ScenicJev(FakeJev):
+    async def decide(self, state, questions):
+        self.calls.append(state)
+        return answers("angry", 0.9, scene=0.2 if "argue" in state["line"] else 0.95)
+
+
+sj = ScenicJev()
+ds = asyncio.run(direct_blocks(["He slammed the door and shouted at them all.",
+                                "I argue that winning is a habit, not a mood."], "en", sj,
+                               book="Winning by Tim S. Grover", chapter="The Chase"))
+check("the scene is acted and the argument is not", ds[0].delivery == "angry" and ds[1] == PLAIN)
+check("JEV is told what the book and chapter are, and reads three paragraphs each way",
+      sj.calls[0]["book"] == "Winning by Tim S. Grover" and sj.calls[0]["chapter"] == "The Chase"
+      and director.CONTEXT_BLOCKS == 3)
+
 # --- 4. One delivery per chunk -----------------------------------------------------
-blocks = [("a", "x"), ("b", "y"), ("c", "z"), ("d", "w")]
+LONG = "the harbour lay grey and still under a low sky that morning"      # 11 words
+blocks = [("a", LONG), ("b", LONG), ("c", LONG), ("d", LONG)]
 runs = group_by_direction(blocks, [PLAIN, en, en, PLAIN])
 check("chunks break where the delivery changes",
       [len(r[1]) for r in runs] == [1, 2, 1] and [b for _, r in runs for b in r] == blocks)
+
+# A chunk of a few words is where the narrator fails (Winning: 9 of 63 chunks of
+# 8 words or fewer, "Job not finished." -> "job not fail"): a short plain line
+# joins the paragraph before it.
+from types import SimpleNamespace as El  # noqa: E402
+para, head = El(tag="p"), El(tag="h2")
+runs = group_by_direction([(para, LONG), (para, "Job not finished.")], [en, PLAIN])
+check("a short plain line joins the directed paragraph before it",
+      len(runs) == 1 and runs[0][0] == en and len(runs[0][1]) == 2, str([(d.delivery, len(r)) for d, r in runs]))
+runs = group_by_direction([(para, LONG), (para, "Job not finished."), (para, LONG)], [en, PLAIN, PLAIN])
+check("next to a plain paragraph it is packed with that one, as before",
+      [len(r) for _, r in runs] == [2, 1] or [len(r) for _, r in runs] == [1, 2], str([(d.delivery, len(r)) for d, r in runs]))
+runs = group_by_direction([(para, LONG), (para, "Job not finished."), (para, LONG)], [en, PLAIN, en])
+check("the delivery that returns after it is one run again", len(runs) == 1 and len(runs[0][1]) == 3)
+runs = group_by_direction([(para, LONG), (para, LONG)], [en, PLAIN])
+check("a plain paragraph of normal length stays its own chunk", [len(r) for _, r in runs] == [1, 1])
+runs = group_by_direction([(para, LONG), (head, "Chapter Two")], [en, PLAIN])
+check("a heading is never folded into the paragraph before it", [len(r) for _, r in runs] == [1, 1])
+runs = group_by_direction([(para, LONG), (para, "Run!")], [PLAIN, direction_for("shouted", "en")])
+check("a short directed line keeps its own delivery", [len(r) for _, r in runs] == [1, 1]
+      and runs[1][0].delivery == "shouted")
+runs = group_by_direction([(para, "Seriously?"), (para, LONG)], [PLAIN, en])
+check("with nothing before it, a short plain line stands where it is", [len(r) for _, r in runs] == [1, 1])
 check("a directed take never shares a cache entry with a plain one",
       cache_text("t", None) == "t" == cache_text("t", PLAIN) and cache_text("t", en) != "t"
       and cache_text("t", en) != cache_text("t", direction_for("hushed", "en")))

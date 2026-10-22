@@ -63,10 +63,18 @@
       <ul class="needs">
         <li><strong>Your Kobo</strong> and its USB cable.</li>
         <li><strong>Three small accounts</strong> (a server, a narration GPU and a voice director). The next page walks you through them, and each one is optional.</li>
-        <li><strong>A short clip of the narrator's voice</strong>, if you want the best voices. You can also narrate for free on this Mac.</li>
+        <li><strong>Ten seconds of your voice</strong>, if you want the best voices: Voxie gives you three short sentences to read aloud. You can also narrate for free on this Mac.</li>
       </ul>
         </div>
         <div class="kobo-stage hero-art" data-state="idle"><div class="kobo-slot"></div></div>
+      </div>
+      <div class="update" id="update-box">
+        <p class="status" id="update-status" role="status">Checking for a newer version ...</p>
+        <div class="actions left">
+          <button type="button" class="primary small" id="update-btn" hidden>Update Voxie</button>
+          <button type="button" class="ghost small" id="update-recheck" hidden>Check again</button>
+        </div>
+        <details class="log" id="update-details" hidden><summary>Details</summary><pre id="update-log"></pre></details>
       </div>
       <div class="actions">
         <button class="primary" id="start">Start</button>
@@ -94,8 +102,8 @@
           <a id="prepare-openrouter" class="secondary button-link" href="#" target="_blank" rel="noopener">Open OpenRouter</a>
         </li>
         <li>
-          <h2>A voice clip <span class="optional">8 to 15 seconds</span></h2>
-          <p>Your own recording, or a YouTube link to someone who agreed to be cloned, with the start and end times and the exact words said.</p>
+          <h2>Your voice <span class="optional">ten seconds, in a quiet room</span></h2>
+          <p>Voxie gives you three short sentences to read aloud, recorded right here with your Mac's microphone. Slowly, with a full second after each full stop: the narrator copies how you read. Or use a recording or a YouTube link of someone who agreed to be cloned.</p>
         </li>
       </ol>
       <p class="fine" id="prepare-disclosure"></p>
@@ -327,29 +335,55 @@
           <button type="button" class="secondary small" id="voice-more">Add another voice</button>
         </div>
         <div id="voice-form-wrap">
-          <p>No voice comes with Voxie. Use 8 to 15 seconds of someone speaking clearly: your own voice, or someone who agreed to it.</p>
-          <p class="hint">The clip's mood becomes the narrator's: calm, clear, one voice only, no laughs, sighs or music.</p>
+          <p id="voice-intro">No voice comes with Voxie. Record your own, or use someone who agreed to it.</p>
+          <div class="segmented" role="radiogroup" aria-label="How to make the voice">
+            <label><input type="radio" name="voice-mode" value="script" checked><span>Read a short text (best)</span></label>
+            <label><input type="radio" name="voice-mode" value="clip"><span>Use a recording or a link</span></label>
+          </div>
+
+          <div id="voice-script-panel">
+            <p class="hint">The narrator copies <em>how</em> you read, not only your voice: your pauses, your speed. This text is written so that a calm reading gives a good narrator.</p>
+            <blockquote class="script-card" id="script-card" aria-label="The text to read"></blockquote>
+            <ul class="script-how" id="script-how"></ul>
+            <div class="recorder">
+              <button type="button" class="primary" id="rec-start">Record</button>
+              <button type="button" class="secondary" id="rec-stop" hidden>Stop</button>
+              <span class="rec-time" id="rec-time" role="timer" aria-live="off"></span>
+            </div>
+            <audio id="rec-audio" controls hidden></audio>
+            <div class="field" id="script-file-field">
+              <label for="script-file">Or a voice memo of you reading it</label>
+              <input id="script-file" type="file" accept="audio/*,video/*">
+            </div>
+          </div>
+
+          <div id="voice-clip-panel" hidden>
+            <p>Use 8 to 15 seconds of someone speaking clearly: your own voice, or someone who agreed to it.</p>
+            <p class="hint">The clip's mood and pace become the narrator's: calm, clear, a full second after each full stop, one voice only, no laughs, sighs or music.</p>
+          </div>
           <p class="hint"><strong>Two steps:</strong> check the clip, then listen and press <em>Keep this voice</em>. Nothing is saved before that.</p>
           <form id="voice-form" novalidate>
-            <div class="segmented" role="radiogroup" aria-label="Where the clip comes from">
-              <label><input type="radio" name="voice-source" value="url" checked><span>A YouTube link</span></label>
-              <label><input type="radio" name="voice-source" value="file"><span>A file</span></label>
-            </div>
-            <div class="field" id="voice-url-field">
-              <label for="voice-url">Link</label>
-              <input id="voice-url" type="url" placeholder="https://youtu.be/…?t=90" autocomplete="off">
-            </div>
-            <div class="field" id="voice-file-field" hidden>
-              <label for="voice-file">Audio or video file</label>
-              <input id="voice-file" type="file" accept="audio/*,video/*">
-            </div>
-            <div class="pair">
-              <div class="field"><label for="voice-start">Starts at</label><input id="voice-start" placeholder="1:30" inputmode="numeric"></div>
-              <div class="field"><label for="voice-end">Ends at</label><input id="voice-end" placeholder="1:42" inputmode="numeric"></div>
-            </div>
-            <div class="field">
-              <label for="voice-text">Exactly what is said</label>
-              <textarea id="voice-text" rows="3"></textarea>
+            <div id="voice-clip-fields" hidden>
+              <div class="segmented" role="radiogroup" aria-label="Where the clip comes from">
+                <label><input type="radio" name="voice-source" value="url" checked><span>A YouTube link</span></label>
+                <label><input type="radio" name="voice-source" value="file"><span>A file</span></label>
+              </div>
+              <div class="field" id="voice-url-field">
+                <label for="voice-url">Link</label>
+                <input id="voice-url" type="url" placeholder="https://youtu.be/…?t=90" autocomplete="off">
+              </div>
+              <div class="field" id="voice-file-field" hidden>
+                <label for="voice-file">Audio or video file</label>
+                <input id="voice-file" type="file" accept="audio/*,video/*">
+              </div>
+              <div class="pair">
+                <div class="field"><label for="voice-start">Starts at</label><input id="voice-start" placeholder="1:30" inputmode="numeric"></div>
+                <div class="field"><label for="voice-end">Ends at</label><input id="voice-end" placeholder="1:42" inputmode="numeric"></div>
+              </div>
+              <div class="field">
+                <label for="voice-text">Exactly what is said</label>
+                <textarea id="voice-text" rows="3"></textarea>
+              </div>
             </div>
             <div class="field">
               <label for="voice-name">Name</label>
@@ -370,8 +404,9 @@
           </form>
           <div class="voice-preview" id="voice-preview" hidden>
             <h3>Listen before you keep it</h3>
-            <p class="hint">This is the clip the narrator will copy, trimmed to the words you typed.</p>
+            <p class="hint">This is the clip the narrator will copy, trimmed to the words. Listen to the pauses between sentences: the narrator will leave the same ones.</p>
             <audio id="voice-audio" controls preload="auto"></audio>
+            <p class="notice" id="voice-retake" hidden>The narrator would copy how this was read. Reading it again, slower, takes a minute and is worth it: every sentence of every book will sound like this one.</p>
             <ul class="voice-warnings" id="voice-warnings"></ul>
             <p class="error" id="voice-keep-error" role="alert"></p>
             <div class="actions left">

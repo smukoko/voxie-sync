@@ -255,6 +255,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .ghost { background: transparent; color: var(--ink-dim); padding: 0.45rem 0.7rem; }
 .ghost:hover:not(:disabled) { color: var(--ink); }
 .small { padding: 0.35rem 0.75rem; font-size: 0.875rem; flex: none; }
+/* The text to read for the narrator's voice: large, one sentence a line, the
+   pauses written out between them (they are what the narrator copies). */
+.script-card {
+  margin: 0.75rem 0; padding: 1rem 1.25rem; background: var(--panel);
+  border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: var(--radius-small);
+}
+.script-card p { margin: 0; font-size: 1.25rem; line-height: 1.5; }
+.script-pause { display: block; margin: 0.35rem 0; font-size: 0.8125rem; font-family: var(--mono); color: var(--amber-ink); }
+@media (prefers-color-scheme: dark) { .script-pause { color: var(--amber); } }
+.script-how { margin: 0 0 1rem; padding-left: 1.1rem; font-size: 0.9375rem; color: var(--ink-dim); }
+.script-how li { margin: 0.2rem 0; }
+.script-how li::marker { color: var(--amber); }
+.recorder { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.rec-time { font-family: var(--mono); font-size: 0.875rem; color: var(--ink-dim); }
+#rec-audio { width: 100%; margin-bottom: 1rem; }
 .voice-preview { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .voice-preview h3 { margin: 0; font-size: 1rem; }
 .voice-preview audio { width: 100%; margin-top: 0.75rem; }
@@ -373,3 +388,8 @@ details.log pre {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* The update box on the first page: a line of status and, when it matters, a button. */
+.update { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.update .status { margin-top: 0; }
+.update .actions { margin-top: 0.5rem; }

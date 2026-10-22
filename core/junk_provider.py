@@ -26,7 +26,7 @@ Three of them:
              call per document and changes no behaviour, which is what makes it
              safe to leave on for a book before switching.
 
-Chosen with JUNK_PROVIDER (ai_brain | jev | shadow). Nothing here is imported
+Chosen with JUNK_PROVIDER (auto | ai_brain | jev | shadow). Nothing here is imported
 at module load: ai_brain pulls in a deep learning stack and jev needs a network
 client, and the --no-audio path consults neither.
 """
@@ -489,6 +489,24 @@ def build(name):
     return _REGISTRY[key]()
 
 
+def has_openrouter_key(env=None):
+    """True when the environment carries an OpenRouter key (either spelling)."""
+    env = os.environ if env is None else env
+    return any((env.get(n) or "").strip() for n in _TRANSPORTS["openrouter"]["keys"])
+
+
+def resolved_choice(env=None):
+    """JUNK_PROVIDER with "auto" (the default) settled: JEV for someone who pays
+    for OpenRouter, the local classifier for someone who does not. A person who
+    pays for the director gets the better filter too (user, 2026-10-22: even at
+    15 cents more a book); the free route stays what it was."""
+    env = os.environ if env is None else env
+    choice = (env.get("JUNK_PROVIDER") or "auto").strip().lower()
+    if choice == "auto":
+        return "jev" if has_openrouter_key(env) else "ai_brain"
+    return choice
+
+
 def get_junk_provider():
     """The provider the environment asks for.
 
@@ -497,7 +515,7 @@ def get_junk_provider():
     incumbent against jev in that order -- the incumbent decides, because a
     shadow run must not be able to change a book.
     """
-    choice = os.getenv("JUNK_PROVIDER", "ai_brain").strip().lower()
+    choice = resolved_choice()
     if choice != "shadow":
         provider = build(choice)
         fallback = os.getenv("JUNK_FALLBACK", "ai_brain" if choice == "jev" else "none").strip().lower()

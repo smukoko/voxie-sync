@@ -60,6 +60,13 @@ def _brain():
     """
     global _BRAIN
     if _BRAIN is None:
+        for path in (MODEL_JSON, SCALER_PKL):
+            # XGBoost's own error is a path cut off mid-name, repeated once per
+            # section (21 times for one book on 2026-10-22).
+            if not os.path.isfile(path):
+                raise FileNotFoundError(
+                    f"the junk classifier's file {os.path.relpath(path, _REPO_ROOT)} is missing from "
+                    "this install; update Voxie (git pull) or restore the file")
         print("🧠 Booting AI Brain (XGBoost + Groq)...")
         import joblib
         import xgboost as xgb

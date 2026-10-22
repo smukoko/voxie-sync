@@ -21,6 +21,13 @@ import mac_ghost as mg  # noqa: E402
 
 passed = failed = 0
 
+# set_aside opens the failure report page; a test must never write to the real
+# log folder or open a browser.
+reports = []
+mock.patch.object(mg.failure_report, "show_failure",
+                  lambda *a, **k: reports.append(a) or reports_kw.append(k)).start()
+reports_kw = []
+
 
 def check(name, cond, detail=""):
     global passed, failed
@@ -79,15 +86,36 @@ check("for the folder of books that did not finish, with a notice saying how to 
       failed_dir == ["Twisted.epub"] and notices and "drop it into Kobo_Dropzone again" in notices[-1][1],
       f"({failed_dir}, {notices[-1:]})")
 
+check("an engine that fails opens the report page, with what stopped",
+      len(reports) == 1 and reports[0][0] == "Twisted.epub" and "error" in reports[0][1], str(reports))
+
+reports.clear()
 zone, failed_dir, archive, notices = drop(code=mg.NO_VOICE_EXIT)
 check("no narrator voice: the book is set aside too, so it can be dropped again",
       zone == [] and failed_dir == ["Twisted.epub"], f"({zone}, {failed_dir})")
+check("no narrator voice is a setup step, not a failure: no report page", reports == [], str(reports))
 
+reports.clear(); reports_kw.clear()
 zone, failed_dir, archive, notices = drop(code=0, upload_ok=False)
 check("a failed upload: the book goes to the archive, its audiobook is in the kept pack",
       zone == [] and archive == ["Twisted.epub"] and os.path.exists("Twisted_SyncPack.zip"),
       f"({zone}, {archive})")
+check("a failed upload says so: a notice and the report page, with what to do",
+      notices and "could not send" in notices[-1][0] and len(reports) == 1
+      and "start-ghost" in reports[0][1] and reports_kw[0]["headline"] == "A finished book was not sent",
+      f"({notices[-1:]}, {reports})")
 os.remove("Twisted_SyncPack.zip")
+
+reports.clear(); reports_kw.clear()
+os.makedirs("mfa_workspace", exist_ok=True)
+open(os.path.join("mfa_workspace", "012_AF.quarantined"), "w").close()
+zone, failed_dir, archive, notices = drop(code=0)
+check("a narration with holes is uploaded but flagged: notice and report page",
+      archive == ["Twisted.epub"] and notices and "not complete" in notices[-1][0]
+      and len(reports) == 1 and reports_kw[0]["headline"] == "An audiobook has gaps",
+      f"({archive}, {notices[-1:]}, {reports})")
+os.remove(os.path.join("mfa_workspace", "012_AF.quarantined"))
+reports.clear(); reports_kw.clear()
 
 zone, failed_dir, archive, notices = drop(code=0, raises=True)
 check("a watcher error mid-run: the book leaves the drop folder too",
@@ -100,6 +128,19 @@ check("a run that finishes and uploads: archived as before", zone == [] and arch
 zone, failed_dir, archive, notices = drop(code=0, built=False)
 check("an engine that finishes but leaves no book to send: set aside, not narrated again",
       zone == [] and failed_dir == ["Twisted.epub"], f"({zone}, {failed_dir})")
+
+# A watcher that cannot start says why on screen, and exits.
+reports.clear(); reports_kw.clear()
+with mock.patch.object(mg, "notify", lambda *a: None), \
+        mock.patch.object(mg, "CONFIG_FILE", os.path.join(tempfile.mkdtemp(), "none.json")):
+    try:
+        mg.load_gateway_config()
+        code = None
+    except SystemExit as e:
+        code = e.code
+check("a watcher with no config exits 1 and opens the report page, at most hourly",
+      code == 1 and len(reports) == 1 and reports_kw[-1]["key"] == "startup"
+      and reports_kw[-1]["reopen_after"] == 3600, f"({code}, {reports})")
 
 home = tempfile.mkdtemp()
 stuck = os.path.join(home, "Twisted.epub")

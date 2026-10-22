@@ -29,7 +29,8 @@ fastest. A loop the narrator really said takes its time, and stays flagged.
 
 Reads each chunk's .wav and its .txt (what the narrator was given), writes
 the report beside this run's output (--report), prints the flagged chunks.
-Needs mlx-whisper (Apple silicon).
+Needs mlx-whisper (Apple silicon). The judging itself is core/narration_check.py,
+which the engine also uses while it narrates.
 """
 import argparse
 import difflib
@@ -41,76 +42,9 @@ import re
 import sys
 import time
 
-WHISPER = "mlx-community/whisper-large-v3-turbo"
-try:
-    from num2words import num2words
-except ImportError:      # optional: digits then compare as digits
-    num2words = None
-
-
-def words(text):
-    """Lower-case words, tags dropped, numbers spelled out as the narrator says them."""
-    text = re.sub(r"\[[a-z_]+\]", " ", (text or "").lower().replace("’", "'"))
-    if num2words:
-        text = re.sub(r"\d+(?:\.\d+)?", lambda m: " " + num2words(float(m.group()) if "." in m.group()
-                                                                    else int(m.group())) + " ", text)
-    return re.findall(r"[a-z]+(?:'[a-z]+)?", text.replace("-", " "))
-
-
-def listen(wav, guard=False):
-    import mlx_whisper
-    from core.hf_cache import model_path
-    extra = {"word_timestamps": True, "hallucination_silence_threshold": 1.0} if guard else {}
-    return mlx_whisper.transcribe(wav, path_or_hf_repo=model_path(WHISPER), language="en",
-                                  condition_on_previous_text=False, **extra)["text"]
-
-
-LOOP = 5          # one word this many times in a row, as a chunk's last words
-PACE_WORDS = 10   # shorter chunks are a heading or a line: their pace says little
-
-
-def book_pace(chunks):
-    """(slowest, fastest) words per minute of a book's narration, from its
-    chunks' (text words, seconds); None when too few chunks say."""
-    paces = sorted(60 * n / s for n, s in chunks if n >= PACE_WORDS and s > 0)
-    if len(paces) < 20:
-        return None
-    return paces[int(0.01 * (len(paces) - 1))], paces[int(0.99 * (len(paces) - 1))]
-
-
-def drop_whisper_loop(said, want, seconds, pace):
-    """`said` without a loop Whisper made up at the chunk's end, and what was
-    dropped ("" for nothing): see the module's docstring."""
-    n = 0
-    while n < len(said) and said[-1 - n] == said[-1]:
-        n += 1
-    if n < LOOP or not (pace and seconds):
-        return said, ""
-    slow, fast = pace
-    if slow <= 60 * len(want) / seconds <= fast < 60 * len(said) / seconds:
-        return said[:len(said) - n + 1], f"{said[-1]} x{n}"
-    return said, ""
-
-
-def judge(heard, want, seconds, pace):
-    """(extra, missing, where, loop dropped) for one hearing of a chunk."""
-    said, dropped = drop_whisper_loop(words(heard), want, seconds, pace)
-    return (*runs(said, want), dropped)
-
-
-def runs(said, want):
-    """(longest run of heard words the text lacks, longest run of text words not heard, where)."""
-    m = difflib.SequenceMatcher(None, want, said, autojunk=False)
-    extra = missing = 0
-    where = ""
-    for op, i1, i2, j1, j2 in m.get_opcodes():
-        if op in ("insert", "replace") and j2 - j1 > extra:
-            extra, where = j2 - j1, " ".join(said[j1:j2])[:80]
-        if op in ("delete", "replace") and i2 - i1 > missing:
-            missing = i2 - i1
-            if not where:
-                where = "skipped: " + " ".join(want[i1:i2])[:70]
-    return extra, missing, where
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.narration_check import (LOOP, PACE_WORDS, WHISPER, book_pace, drop_whisper_loop,  # noqa: E402,F401
+                                  judge, listen, runs, words)
 
 
 def main():

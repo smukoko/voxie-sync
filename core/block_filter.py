@@ -26,7 +26,8 @@ chapter -- an epigraph, a letter the author quotes, a line of verse -- is
 exactly what a false positive looks like, and it is kept and reported.
 
 Modes, chosen with JUNK_BLOCK_FILTER:
-  off     not asked at all (the default until it has been measured)
+  auto    on with an OpenRouter key, off without one (the default)
+  off     not asked at all
   shadow  asked, and every would-be drop printed, but nothing removed
   on      drops applied
 """
@@ -41,7 +42,12 @@ HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6", "header")
 
 
 def mode():
-    m = os.getenv("JUNK_BLOCK_FILTER", "off").strip().lower()
+    """off | shadow | on. "auto" (the default) is on for someone with an OpenRouter
+    key, who pays for the better filter, and off for the free route."""
+    m = os.getenv("JUNK_BLOCK_FILTER", "auto").strip().lower()
+    if m == "auto":
+        from core.junk_provider import has_openrouter_key
+        return "on" if has_openrouter_key() else "off"
     return m if m in ("off", "shadow", "on") else "off"
 
 

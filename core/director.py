@@ -66,7 +66,19 @@ DELIVERIES = {
 }
 
 BREATH_THRESHOLD = 0.7     # the baseline's value
-CONTEXT_BLOCKS = 2         # neighbours on each side that JEV reads
+CONTEXT_BLOCKS = 3         # neighbours on each side that JEV reads (2 until 2026-10-22)
+# JEV answers a choice with a probability for every delivery. Until 2026-10-22
+# only the top choice was read, so "heavy" at 0.44 against "plain" at 0.42 slowed
+# a paragraph to a crawl. A delivery has to beat plain by this much.
+MIN_MARGIN = float(os.getenv("DIRECTOR_MIN_MARGIN", "0.1"))
+# ...and the paragraph has to be a scene: events, a character feeling or
+# speaking. An author explaining, arguing or advising is one voice, however
+# forceful ("Winning wants to take your control" came back angry); the narrator
+# reads that plainly (the user: exaggerated narration "becomes weird"). Measured
+# on JEV's answers for six books, 2026-10-22: Winning, a self-help book, went
+# from 69% of its paragraphs acted (angry 329, heavy 361) to 8%; the fiction
+# kept 74-89% (Cask 91 -> 89, Yellow Wallpaper 90 -> 84, Canterville 74 -> 74).
+MIN_SCENE_P = float(os.getenv("DIRECTOR_MIN_SCENE_P", "0.5"))
 # Headings, numbers and credits ("One.", "By", "Wilde...") are read neutrally:
 # Canterville's byline came back "amused". Not asked at all, which also saves
 # the call.
@@ -100,6 +112,26 @@ class Direction:
 PLAIN = Direction("plain")
 
 
+def settle(answers):
+    """The delivery to use from JEV's answers: its top choice when it clearly beats
+    plain and the paragraph is a scene, else plain.
+
+    Answers without probabilities (an older JEV, a test's fake) are taken as
+    they come: the top choice, as before.
+    """
+    delivery = answers["delivery"]
+    choice = delivery["choice"]
+    if choice == "plain":
+        return "plain"
+    probs = delivery.get("probabilities") or {}
+    if choice in probs and "plain" in probs and probs[choice] - probs["plain"] < MIN_MARGIN - 1e-9:
+        return "plain"
+    scene = ((answers.get("register") or {}).get("probabilities") or {}).get("scene")
+    if scene is not None and scene < MIN_SCENE_P:
+        return "plain"
+    return choice
+
+
 def direction_for(delivery, language, p_breath=0.0):
     """The controls for one paragraph from JEV's answers: one instruction, a breath."""
     d = DELIVERIES.get(delivery) or DELIVERIES["plain"]
@@ -112,9 +144,21 @@ QUESTIONS = {
     "delivery": {
         "type": "choice",
         "instructions": ("You are directing an audiobook narrator. How should `line` be performed? "
-                         "Judge it from the story: `before` and `after` are the neighbouring "
-                         "paragraphs. A scene's mood carries over unless the text turns."),
+                         "Judge it from the story: `book` and `chapter` say what it is part of, and "
+                         "`before` and `after` are the paragraphs on either side, so look ahead as well "
+                         "as back. A scene's mood carries over unless the text turns."),
         "criteria": {name: d.criteria for name, d in DELIVERIES.items()},
+    },
+    "register": {
+        "type": "choice",
+        "instructions": ("Is `line` a scene, or the author speaking to the reader? `book` and "
+                         "`chapter` say what it is part of; `before` and `after` are its neighbours."),
+        "criteria": {
+            "scene": "A story told as it happens: events, a character acting, feeling or speaking, "
+                     "including quoted speech.",
+            "exposition": "The author in their own voice: explaining, arguing, advising, reflecting, "
+                          "addressing the reader or listing, however forceful or emotional it is.",
+        },
     },
     "breath_before": {
         "type": "noul",
@@ -147,7 +191,7 @@ def mode(provider, env=None):
     return "on" if has_key else "off"
 
 
-async def direct_blocks(texts, language, jev):
+async def direct_blocks(texts, language, jev, book="", chapter=""):
     """One Direction per paragraph, decided concurrently.
 
     Each paragraph is judged with CONTEXT_BLOCKS neighbours on each side, so
@@ -164,20 +208,31 @@ async def direct_blocks(texts, language, jev):
                 state={"line": texts[i][:1200],
                        "before": " ".join(texts[lo:i])[-1200:],
                        "after": " ".join(texts[i + 1:hi])[:1200],
+                       "book": book, "chapter": chapter,
                        "language": language or "en"},
                 questions=QUESTIONS)
-            return direction_for(ans["delivery"]["choice"], language,
-                                 float(ans["breath_before"]["noul"]))
+            return direction_for(settle(ans), language, float(ans["breath_before"]["noul"]))
         except Exception:
             return PLAIN
     return list(await asyncio.gather(*(one(i) for i in range(len(texts)))))
+
+
+# A chunk of a few words is where the narrator fails: on Winning, 9 of the 63
+# chunks of 8 words or fewer did not say their text (a skipped word, "Zero." heard
+# as "See you", "Welcome." as noise) against 15 of the other 795, and the 3-word
+# `"Job not finished."` came out "job not fail". A short plain line therefore
+# joins the paragraph before it instead of standing alone.
+SHORT_RUN_WORDS = 8
+_HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6", "header")
 
 
 def group_by_direction(blocks, directions):
     """[(Direction, [blocks])]: consecutive paragraphs with the same direction.
 
     A request carries one instruction, so a chunk must never span two
-    deliveries; the packer then works inside each run.
+    deliveries; the packer then works inside each run. A run of a few plain
+    words (and no heading) is folded into the run before it, taking its
+    delivery: the director's own rule is that a scene's mood carries over.
     """
     runs = []
     for block, d in zip(blocks, directions):
@@ -185,7 +240,21 @@ def group_by_direction(blocks, directions):
             runs[-1][1].append(block)
         else:
             runs.append((d, [block]))
-    return runs
+
+    def short_plain(run):
+        d, members = run
+        return (d.plain and sum(len(m[1].split()) for m in members) <= SHORT_RUN_WORDS
+                and not any(getattr(m[0], "tag", "") in _HEADINGS for m in members))
+
+    merged = []
+    for run in runs:
+        if merged and short_plain(run):
+            merged[-1][1].extend(run[1])
+        elif merged and merged[-1][0] == run[0]:
+            merged[-1][1].extend(run[1])        # a fold can leave two runs of one delivery side by side
+        else:
+            merged.append((run[0], list(run[1])))
+    return merged
 
 
 def summary(directions):

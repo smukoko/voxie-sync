@@ -203,13 +203,17 @@ from core import voices as voices_mod  # noqa: E402
 vdir = os.path.join(tmp, "voices")
 
 
+calls = []
+
+
 def fake_add_voice(**kw):
+    calls.append(kw)
     os.makedirs(kw["voices_dir"], exist_ok=True)
     name = kw["name"].replace(" ", "_")
     open(os.path.join(kw["voices_dir"], name + ".wav"), "wb").write(b"RIFF....WAVE")
     open(os.path.join(kw["voices_dir"], name + ".json"), "w").write("{}")
     return {"name": name, "seconds": 9.1, "warnings": ["There is noise or music in the pauses."],
-            "heard": "hello", "advice": "calm"}
+            "heard": "hello", "advice": "calm", "retake": kw.get("name") == "hasty"}
 
 
 def run_voice(name):
@@ -240,11 +244,69 @@ with mock.patch.object(voices_mod, "VOICES_DIR", vdir), \
     r = c.post("/api/voice", headers=H, data={"url": "https://youtu.be/x", "text": "hi", "name": "grandad",
                                               "consent": "self"}).get_json()
     check("a name already taken is refused before any work", not r.get("job") and "already exists" in r["error"])
+    # The text to read (libra_cli/voice_script.py): the page gets it from the
+    # server, and a recording of it is checked against exactly those words.
+    from libra_cli import voice_script
+    st = c.get("/api/state", headers=H).get_json()
+    check("the page is given the text to read, three sentences",
+          st["voiceScript"]["text"] == voice_script.TEXT and len(st["voiceScript"]["sentences"]) == 3
+          and st["voiceScript"]["how"])
+    import io as _io
+    job = c.post("/api/voice", headers=H, data={"script": "1", "name": "hasty", "consent": "self",
+                                               "text": "SOMETHING ELSE", "url": "https://youtu.be/x",
+                                               "start": "5", "end": "20",
+                                               "file": (_io.BytesIO(b"RIFFxxxxWAVE"), "recording.webm")}).get_json()["job"]
+    for _ in range(50):
+        v = c.get(f"/api/jobs/{job}", headers=H).get_json()
+        if v["status"] != "running":
+            break
+        time.sleep(0.05)
+    asked = calls[-1]
+    check("a reading is checked against the script, whatever else the form says",
+          asked["text"] == voice_script.TEXT and asked["url"] is None and asked["start"] is None
+          and asked["end"] is None and asked["file"].endswith("recording.webm"), str(asked))
+    check("a reading that would teach the narrator to hurry comes back as a retake",
+          v["status"] == "done" and v["result"]["retake"] is True)
+    c.post("/api/voice/discard", headers=H, json={"staged": v["result"]["staged"]})
+    r = c.post("/api/voice", headers=H, data={"script": "1", "name": "empty", "consent": "self"}).get_json()
+    check("a reading with no recording is refused in words", not r.get("job") and "Record yourself" in r["error"])
     v = run_voice("other")
+    check("an ordinary clip is not a retake", v["result"]["retake"] is False)
     staged = v["result"]["staged"]
     c.post("/api/voice/discard", headers=H, json={"staged": staged})
     check("Try again leaves nothing behind", not os.path.exists(os.path.join(vdir, "other.wav"))
           and c.get(f"/api/voice/preview/{staged}", headers=H).status_code == 404)
+
+# --- 7. The Update button -----------------------------------------------------------------
+from libra_cli import updater  # noqa: E402
+fresh = {"current": "aaa1111", "latest": "bbb2222", "behind": 3, "ahead": 0, "dirty": False,
+         "can_update": True, "note": "", "error": "", "date": "2026-10-22"}
+with mock.patch.object(updater, "check", lambda root: dict(fresh)):
+    r = c.get("/api/update/check", headers=H).get_json()
+    check("the page is told a newer version is ready", r["ok"] and r["behind"] == 3 and r["can_update"] and r["date"])
+check("asking needs the key", c.get("/api/update/check").status_code == 403)
+with mock.patch.object(updater, "check", lambda root: {**fresh, "error": "GitHub could not be reached: offline"}):
+    r = c.get("/api/update/check", headers=H).get_json()
+    check("no network is an error the page can show", not r["ok"] and "offline" in r["error"])
+with mock.patch.object(cli, "run_update", lambda on_line, with_server=True: (on_line("Updating aaa1111 to bbb2222"),
+                       {"changed": True, "to": "bbb2222", "watcher": "restarted", "server": "updated" if with_server else ""})[1]):
+    job = c.post("/api/update", headers=H, json={}).get_json()["job"]
+    for _ in range(50):
+        v = c.get(f"/api/jobs/{job}", headers=H).get_json()
+        if v["status"] != "running":
+            break
+        time.sleep(0.05)
+    check("the update runs as a job with its log and result",
+          v["status"] == "done" and v["result"]["to"] == "bbb2222" and v["result"]["server"] == "updated"
+          and any("Updating" in l for l in v["lines"]), str(v))
+with mock.patch.object(cli, "run_update", lambda on_line, with_server=True: (_ for _ in ()).throw(updater.UpdateError("edits of its own"))):
+    job = c.post("/api/update", headers=H, json={"server": False}).get_json()["job"]
+    for _ in range(50):
+        v = c.get(f"/api/jobs/{job}", headers=H).get_json()
+        if v["status"] != "running":
+            break
+        time.sleep(0.05)
+    check("a refusal reaches the page in its own words", v["status"] == "failed" and "edits of its own" in v["error"])
 
 for p in patches:
     p.stop()

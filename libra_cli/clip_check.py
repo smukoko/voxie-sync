@@ -37,9 +37,18 @@ QUIET_LUFS = -40.0        # the raw recording, before normalising
 CLIPPED_SHARE = 0.0005    # of samples at full scale
 PAUSE_MARGIN_DB = 15.0    # speech must stand this far above the pauses' floor
 MIN_PAUSE = 0.25          # seconds between words that count as a pause
+# What the narrator copies from how the clip is read, not only from the voice:
+# a clip read quickly after each full stop gave a narrator that starts quickly
+# after every full stop (2026-10-22: 0.34 s between the two sentences of the
+# first install's clip). An audiobook leaves about a second.
+SENTENCE_PAUSE_MIN = 0.5  # median seconds between sentences under which a retake is advised
+FAST_WPM = 190            # an audiobook is about 150
+SLOW_WPM = 90
 MLX_MODEL = os.environ.get("VOICE_CHECK_MODEL", "mlx-community/whisper-large-v3-turbo")
 FASTER_MODEL = os.environ.get("VOICE_CHECK_MODEL_FASTER", "large-v3-turbo")
 
+PAUSE_ADVICE = ("Leave about a second after every full stop: count “one” in your head "
+                "before the next sentence.")
 MOOD_ADVICE = ("The clip's mood becomes the narrator's: calm, clear, one voice only, "
                "no laughs, sighs or music.")
 INSTALL_HINT = ("Install mlx-whisper (Mac) or faster-whisper to have clips checked "
@@ -101,15 +110,11 @@ def tokens(text, language=None, spans=False):
     return out if spans else [t for t, _ in out]
 
 
-def match_typed(typed, heard_words, language=None):
-    """Where the typed transcript sits in what Whisper heard.
+def _heard_tokens(heard_words, language=None):
+    """(tokens Whisper heard, the index of the heard word each one came from).
 
-    Returns (share of typed words heard in order, index of the first and last
-    heard word that matched). Whisper writes "5" where a person types "five"
-    and splits "e-mails"; the share tolerates that, a different sentence does not.
+    Tokenised as one string: Whisper hands "d'acheter" over as " d" + "'acheter".
     """
-    typed_t = tokens(typed, language)
-    # Tokenised as one string: Whisper hands "d'acheter" over as " d" + "'acheter".
     joined, starts = "", []
     for w, _, _ in heard_words:
         starts.append(len(joined))
@@ -118,6 +123,18 @@ def match_typed(typed, heard_words, language=None):
     for t, at in tokens(joined, language, spans=True):
         heard_t.append(t)
         owner.append(max(i for i, s0 in enumerate(starts) if s0 <= at))
+    return heard_t, owner
+
+
+def match_typed(typed, heard_words, language=None):
+    """Where the typed transcript sits in what Whisper heard.
+
+    Returns (share of typed words heard in order, index of the first and last
+    heard word that matched). Whisper writes "5" where a person types "five"
+    and splits "e-mails"; the share tolerates that, a different sentence does not.
+    """
+    typed_t = tokens(typed, language)
+    heard_t, owner = _heard_tokens(heard_words, language)
     if not typed_t or not heard_t:
         return 0.0, None, None
     sm = difflib.SequenceMatcher(None, typed_t, heard_t, autojunk=False)
@@ -132,6 +149,40 @@ def match_typed(typed, heard_words, language=None):
     span = blocks[-1].b + blocks[-1].size - blocks[0].b
     share = matched / max(len(typed_t), span)
     return share, first, last
+
+
+_SENTENCE_END = re.compile(r"[.!?\u2026\n]")
+
+
+def sentence_gaps(typed, heard_words, language=None):
+    """[(last word of a sentence, seconds of silence before the next sentence)].
+
+    Sentences are the typed transcript's (a full stop, a question or exclamation
+    mark, a line break), found in what Whisper heard by matching words; a word
+    Whisper did not hear in order is skipped. The gap is from the end of that
+    word to the start of the next one.
+    """
+    norm = unicodedata.normalize("NFC", typed).lower().replace("\u2019", "'")
+    spans = [(m.start(), m.end()) for m in _TOKEN.finditer(norm)]
+    typed_t = tokens(typed, language)
+    if len(spans) != len(typed_t) or len(spans) < 2:
+        return []           # digits spelled out change the count: no guess then
+    heard_t, owner = _heard_tokens(heard_words, language)
+    sm = difflib.SequenceMatcher(None, typed_t, heard_t, autojunk=False)
+    where = {}
+    for b in sm.get_matching_blocks():
+        for k in range(b.size):
+            where[b.a + k] = owner[b.b + k]
+    out = []
+    for k in range(len(spans) - 1):
+        between = norm[spans[k][1]:spans[k + 1][0]]
+        if not _SENTENCE_END.search(between):
+            continue
+        i, j = where.get(k), where.get(k + 1)
+        if i is None or j is None or j <= i:
+            continue
+        out.append((typed_t[k], round(max(0.0, heard_words[j][1] - heard_words[i][2]), 2)))
+    return out
 
 
 def runs_past(typed, heard_words, language=None):
@@ -159,6 +210,37 @@ def read_wav(path):
     if channels > 1:
         x = x.reshape(-1, channels).mean(axis=1)
     return x, sr
+
+
+def pace_report(text, spoken, language=None):
+    """How the clip is paced, and what to tell the reader: a dict with "wpm",
+    "sentence_gaps" ([(word, seconds)]), "warnings" and "retake" (True when the
+    clip would teach the narrator to hurry).
+
+    `spoken` is the heard words from the first typed word to the last.
+    """
+    words = len(tokens(text, language))
+    span = spoken[-1][2] - spoken[0][1]
+    wpm = 60.0 * words / span if span > 0 and words else 0.0
+    gaps = sentence_gaps(text, spoken, language)
+    warnings, retake = [], False
+    if gaps:
+        ordered = sorted(g for _, g in gaps)
+        median = ordered[len(ordered) // 2]
+        if median < SENTENCE_PAUSE_MIN:
+            retake = True
+            warnings.append(
+                f"You began the next sentence {median:.1f} s after a full stop. The narrator copies "
+                "that: it would run its sentences together after every full stop of the book. "
+                + PAUSE_ADVICE)
+    if wpm > FAST_WPM:
+        retake = True
+        warnings.append(f"You read at about {wpm:.0f} words a minute; an audiobook is about 150, and "
+                        "the narrator copies the speed. Slower, as if reading aloud to someone.")
+    elif words >= 12 and 0 < wpm < SLOW_WPM:
+        warnings.append(f"You read at about {wpm:.0f} words a minute, slower than an audiobook "
+                        "(about 150); the narrator would drag.")
+    return {"wpm": round(wpm), "sentence_gaps": gaps, "warnings": warnings, "retake": retake}
 
 
 def check(raw_path, text, language, lufs=None, listen=None):
@@ -209,6 +291,10 @@ def check(raw_path, text, language, lufs=None, listen=None):
     start = max(0.0, spoken[0][1] - LEAD_IN)
     end = min(duration, spoken[-1][2] + TAIL)
     report["trim"] = (round(start, 3), round(end, 3))
+    pace = pace_report(text, spoken, language)
+    report["pace"] = {"wpm": pace["wpm"], "sentence_gaps": pace["sentence_gaps"]}
+    report["retake"] = pace["retake"]
+    warnings += pace["warnings"]
 
     gaps = [(a[2], b[1]) for a, b in zip(spoken, spoken[1:]) if b[1] - a[2] >= MIN_PAUSE]
     if gaps:

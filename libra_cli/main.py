@@ -17,6 +17,7 @@ from core import platform_support
 from core.platform_support import IS_LINUX, IS_MAC
 from core import accounts, envfile, links
 from core.gateway_address import abs_url, as_url, gateway_url, parse_gateway
+from libra_cli import voice_script
 
 # Define paths
 CONFIG_FILE = os.path.expanduser("~/.librasync.json")
@@ -659,6 +660,20 @@ def _offer_voice():
         click.echo("   Later: voxie voice-add --help")
         return
     from libra_cli.voice import VoiceError, add_voice
+    if click.confirm("   Record yourself reading a short text? (best: the narrator copies how you "
+                     "read, pauses included)", default=True):
+        _print_voice_script()
+        path = os.path.expanduser(click.prompt(
+            "\n   Record it (Voice Memos, QuickTime...), then give the file's path").strip())
+        name = click.prompt("   A name for the voice", default="my voice")
+        try:
+            result = add_voice(file=path, text=voice_script.TEXT, name=name, language="en",
+                               consent="self", source_name=None)
+        except VoiceError as e:
+            click.secho(f"   ❌ {e}  (try again later: voxie voice-add --script --file ...)", fg="red")
+            return
+        _report_voice(result)
+        return
     source = click.prompt("   A YouTube link, or the path of an audio/video file").strip()
     is_file = os.path.exists(os.path.expanduser(source))
     start = click.prompt("   Where the clip starts (e.g. 1:30)", default="0")
@@ -675,14 +690,32 @@ def _offer_voice():
     except VoiceError as e:
         click.secho(f"   ❌ {e}  (try again later: voxie voice-add --help)", fg="red")
         return
+    _report_voice(result)
+
+
+def _print_voice_script():
+    click.echo("\n   Read this, slowly:\n")
+    for i, line in enumerate(voice_script.SENTENCES):
+        if i:
+            click.echo("       (pause: count one)")
+        click.secho(f"       {line}", bold=True)
+    click.echo("")
+    for tip in voice_script.HOW:
+        click.echo(f"   - {tip}")
+
+
+def _report_voice(result):
     click.secho(f"   ✅ Voice '{result['name']}' added: {result['seconds']}s, trimmed to the words.", fg="green")
     for w in result["warnings"]:
         click.secho(f"   ⚠️  {w}", fg="yellow")
+    if result.get("retake"):
+        click.secho("   ↻ Read it again if you can: every sentence of every book will be read like this "
+                    "one. Add it again under another name once you have read it better.",
+                    fg="yellow")
 
 
 def _docker_ready():
-    return shutil.which("docker") is not None and \
-        subprocess.run(["docker", "info"], capture_output=True).returncode == 0
+    return platform_support.ensure_docker(say=lambda m: click.echo(f"   {m}"))
 
 
 def _pair_kobo(ctx):
@@ -798,6 +831,11 @@ def _start_ghost_systemd(repo_root, ghost_path):
 def start_ghost():
     """Installs and starts the watcher as a background service (macOS launchd, Linux systemd)."""
     click.secho("\n👻 Mac Ghost Automator Initialized...", fg="blue", bold=True)
+    try:        # an install made before the junk filter became "auto" follows its key from here on
+        from libra_cli import updater
+        updater.migrate_env(ensure_env_file())
+    except Exception:
+        pass
 
     # 1. Locate the ghost script exactly where the CLI is installed
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -1251,14 +1289,16 @@ def set_abs(url, clear, allow_http):
 @click.option("--source-name", help="What to record as the clip's source (default: the file's name).")
 @click.option("--start", help="Where the clip starts: 90, 1:30 or 00:01:30.")
 @click.option("--end", help="Where it ends (3-30 seconds after the start; 12s if omitted).")
-@click.option("--text", required=True, help="Exactly what is said in the clip.")
+@click.option("--text", help="Exactly what is said in the clip.")
+@click.option("--script", "use_script", is_flag=True,
+              help="The clip is you reading the text `voxie voice-script` prints (use with --file).")
 @click.option("--name", help="What to call the voice, e.g. 'my voice'.")
 @click.option("--language", default="en", show_default=True, type=click.Choice(["en"]),
               help="The language this voice reads. Voxie narrates English only for now.")
 @click.option("--consent", type=click.Choice(["self", "permission"]), required=True,
               help="self: it is your own voice. permission: the speaker agreed to be cloned.")
 @click.option("--json", "as_json", is_flag=True, help="Print one JSON result line (for scripts).")
-def voice_add(url, file_path, source_name, start, end, text, name, language, consent, as_json):
+def voice_add(url, file_path, source_name, start, end, text, use_script, name, language, consent, as_json):
     """Add a narrator voice from a short clip and its transcript. No voice ships with libra-sync.
 
     The clip is checked first: trimmed to the typed words, refused if it says
@@ -1267,6 +1307,11 @@ def voice_add(url, file_path, source_name, start, end, text, name, language, con
     one voice only, no laughs, sighs or music.
     """
     from libra_cli.voice import VoiceError, add_voice
+    if use_script:
+        url, start, end, text = None, None, None, voice_script.TEXT
+    elif not text:
+        click.secho("❌ Give --text (exactly what is said), or --script with a recording of the script.", fg="red")
+        sys.exit(1)
     try:
         result = add_voice(url=url, file=file_path, start=start, end=end, text=text,
                            name=name, language=language, consent=consent, source_name=source_name)
@@ -1284,7 +1329,95 @@ def voice_add(url, file_path, source_name, start, end, text, name, language, con
         click.echo(f"   Whisper heard: “{result['heard'][:200]}” ({result['match']:.0%} of your words).")
     for w in result["warnings"]:
         click.secho(f"   ⚠️  {w}", fg="yellow")
+    if result.get("retake"):
+        click.secho("   ↻ Worth reading again: the narrator copies this pace and these pauses.", fg="yellow")
     click.echo(f"   Narrate with it:  --voice {result['name']}   (or COSY_VOICE={result['name']} in .env)")
+
+
+def _watcher_installed():
+    if IS_LINUX:
+        return os.path.exists(os.path.join(os.getenv("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+                                           "systemd", "user", platform_support.SYSTEMD_UNIT))
+    return os.path.exists(os.path.expanduser("~/Library/LaunchAgents/com.librasync.ghost.plist"))
+
+
+def _book_running():
+    """True while an engine narrates a book: a restart now would stop it."""
+    try:
+        return subprocess.run(["pgrep", "-f", "librerian_engine_v3.py"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+def run_update(on_line, with_server=True):
+    """Update this Voxie: the checkout, what it needs, its settings, the watcher, the server.
+
+    Used by `voxie update` and the setup page's Update button. Raises
+    updater.UpdateError for what the person must act on. Returns what was done.
+    """
+    from libra_cli import updater
+    root = repo_root_dir()
+    res = updater.update_checkout(root, on_line)
+    if res["deps"]:
+        updater.install_dependencies(root, on_line)
+    for line in updater.migrate_env(ensure_env_file()):
+        on_line("Settings: " + line + ".")
+    done = {**res, "watcher": "", "server": ""}
+    if res["changed"] and _watcher_installed():
+        if _book_running():
+            done["watcher"] = "later"
+            on_line("A book is being narrated, so the watcher keeps its old code until it is done: "
+                    "then run  voxie start-ghost.")
+        else:
+            on_line("Restarting the watcher ...")
+            start_ghost.callback()
+            done["watcher"] = "restarted"
+    target = _load_config().get("SERVER_SSH")
+    if with_server and target and res["changed"]:
+        try:
+            updater.update_server(root, target, on_line)
+            done["server"] = "updated"
+        except updater.UpdateError as e:
+            done["server"] = "skipped"
+            on_line(f"Your server was not updated: {e}")
+    return done
+
+
+@cli.command("update")
+@click.option("--server/--no-server", default=True, help="Also update the Voxie server, when you have one.")
+def update_cmd(server):
+    """Update Voxie to the latest version (this computer, its watcher, your server)."""
+    from libra_cli import updater
+    try:
+        done = run_update(lambda line: click.echo(f"   {line}"), with_server=server)
+    except updater.UpdateError as e:
+        click.secho(f"❌ {e}", fg="red")
+        sys.exit(1)
+    if done["changed"]:
+        click.secho(f"✅ Voxie is now {done['to']}.", fg="green")
+        if done["server"] == "":
+            click.echo("   Nothing to update on a server. The Kobo's plugin changes only when you run "
+                       "voxie setup-kobo again with the cable.")
+
+
+@cli.command("status")
+def status_cmd():
+    """What Voxie is doing with the book you dropped, and how long is left."""
+    from core import progress
+    status = progress.read()
+    click.echo(progress.describe(status))
+    if status and status.get("stage") not in ("done", "failed"):
+        quiet = (time.time() - status.get("updated", time.time())) / 60
+        if quiet > 10:
+            click.secho(f"   Nothing has changed for {quiet:.0f} minutes. Is the watcher running? "
+                        "voxie start-ghost; its log: ~/Library/Logs/librasync-ghost.out", fg="yellow")
+
+
+@cli.command("voice-script")
+def voice_script_cmd():
+    """Print the short text to read aloud to make your narrator's voice, and how to read it."""
+    _print_voice_script()
+    click.echo("\n   Record it, then:  voxie voice-add --script --file recording.m4a --name \"my voice\" --consent self")
 
 
 @cli.command("voices")
