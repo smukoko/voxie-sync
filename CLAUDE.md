@@ -254,4 +254,7 @@ One line each; the evidence is in the commit that made the rule.
 
 - Never commit to `main`; branches `feat/…`, `fix/…`, `chore/…`, `docs/…`; semantic messages with a *why* body.
 - **Never push without asking.** No history rewrites, force-pushes or branch deletion without confirmation.
+- **The public repo's commits carry the GitHub noreply address, both author and committer** (`<id>+smukoko@users.noreply.github.com`; `gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"'`). Setting only the `GIT_*_NAME` variables for the export left the machine's gmail address on a public commit (2026-10-16, found 10-22): set all four `GIT_*` variables, and check `git log --format='%ae %ce'` before the push.
+- `tools/export_public.sh` refuses while the tree has *any* untracked file: move `my_transcript.txt`, `interface/` and `launching_issues/` aside first.
+- `.claude/hooks/block_dangerous.py` blocks a force-push to `main` even with the user's permission. For a public-history rewrite Claude does it locally (`filter-branch`, drop `refs/original`, check the tree is identical) and hands over the `--force-with-lease=main:<old sha>` push line: the user runs it.
 - Secrets never get committed. `.claude/hooks/` gate commits (main branch, syntax, sync contract, boot logic).
